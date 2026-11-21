@@ -1,5 +1,5 @@
+import { readDoc, writeDoc } from '../persist.js';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { cfg, full } from '../config.js';
 import { ghFetch, ghJson, ownerRepos } from '../github.js';
@@ -64,18 +64,14 @@ export class RunnersService implements OnModuleInit, OnModuleDestroy {
   }
   onModuleDestroy() { clearInterval(this.timer); }
 
-  private get historyFile() { return `${cfg.dataDir}/runner-history.json`; }
   private async loadHistory() {
     if (this.historyLoaded) return;
     this.historyLoaded = true;
-    try { this.history = JSON.parse(await readFile(this.historyFile, 'utf8')); } catch { this.history = {}; }
+    try { this.history = readDoc('runner-history') ?? {}; } catch { this.history = {}; }
   }
   private async saveHistory() {
-    try {
-      await mkdir(cfg.dataDir, { recursive: true });
-      await writeFile(this.historyFile + '.tmp', JSON.stringify(this.history), 'utf8');
-      await rename(this.historyFile + '.tmp', this.historyFile);
-    } catch (e: any) { console.warn('[러너] 가동 기록을 쓰지 못했다:', e?.message); }
+    try { writeDoc('runner-history', this.history); }
+    catch (e: any) { console.warn('[러너] 가동 기록을 쓰지 못했다:', e?.message); }
   }
 
   /** 1분마다 상태만 보고 바뀐 순간을 남긴다 */

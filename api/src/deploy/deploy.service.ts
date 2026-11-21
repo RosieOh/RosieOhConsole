@@ -1,5 +1,5 @@
+import { readDoc, writeDoc } from '../persist.js';
 import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { audit } from '../audit.js';
 import { cfg, repoUrl, full } from '../config.js';
 import { DeployTrack, ServiceDef } from '../registry.js';
@@ -57,21 +57,17 @@ export class DeployService {
   private json(path: string): Promise<any> { return ghJson(path); }
 
   // ── 실행 기록 읽기(완료된 실행은 바뀌지 않으므로 결과를 파일에 남겨 다시 읽지 않는다) ──
-  private get cacheFile() { return `${cfg.dataDir}/deploy-readings.json`; }
   private async loadCache() {
     if (this.loaded) return;
     this.loaded = true;
-    try { for (const [k, v] of Object.entries(JSON.parse(await readFile(this.cacheFile, 'utf8')))) this.readings.set(k, v as RunReading); }
+    try { for (const [k, v] of Object.entries(readDoc<Record<string, RunReading>>('deploy-readings') ?? {})) this.readings.set(k, v); }
     catch { /* 처음이거나 깨졌다 — 다시 읽으면 된다 */ }
   }
   private saveCache() {
     clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(async () => {
-      try {
-        await mkdir(cfg.dataDir, { recursive: true });
-        await writeFile(this.cacheFile + '.tmp', JSON.stringify(Object.fromEntries(this.readings)), 'utf8');
-        await rename(this.cacheFile + '.tmp', this.cacheFile);
-      } catch (e: any) { console.warn('[배포] 기록 캐시를 쓰지 못했다:', e?.message); }
+    this.saveTimer = setTimeout(() => {
+      try { writeDoc('deploy-readings', Object.fromEntries(this.readings)); }
+      catch (e: any) { console.warn('[배포] 기록 캐시를 쓰지 못했다:', e?.message); }
     }, 2000);
   }
 

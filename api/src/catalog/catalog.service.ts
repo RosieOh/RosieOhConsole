@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { apkApps, isApkKind } from '../apks/apps.js';
 import { audit } from '../audit.js';
 import { cfg, full, REPO_RE } from '../config.js';
 import { ghJson, ghRaw, ownerRepos } from '../github.js';
 import { JsonStore, RevConflict } from '../json-store.js';
+import { hasBlob, putBlob } from '../persist.js';
 import { DEFAULT_COMPONENTS, DEFAULT_NODES } from './defaults.js';
 import { LOGO_FILE_RE, LOGO_MAX, pickCandidates, prepareLogo } from './logos.js';
 import { UNASSIGNED, buildCatalog, emptyOverrides } from './merge.js';
@@ -30,6 +30,7 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
   private repoList?: { at: number; list: { name: string; description: string; updated: string; archived: boolean }[] };
   private seedTimer?: NodeJS.Timeout;
 
+  /** 파일 저장 모드의 로고 폴더(DB 모드면 blob_file 표) */
   get logoDir() { return `${cfg.dataDir}/logos`; }
 
   onModuleInit() {
@@ -79,7 +80,7 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
     const logo = (v: unknown) => {
       if (v === null) return null;
       const s = String(v);
-      if (!LOGO_FILE_RE.test(s) || !existsSync(`${this.logoDir}/${s}`)) throw new BadRequestException('로고 파일을 찾지 못했습니다');
+      if (!LOGO_FILE_RE.test(s) || !hasBlob(`logos/${s}`)) throw new BadRequestException('로고 파일을 찾지 못했습니다');
       return s;
     };
     const order = (v: unknown) => { const n = Number(v); if (!Number.isFinite(n)) throw new BadRequestException('순서는 숫자입니다'); return Math.round(n); };
@@ -179,10 +180,8 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
 
   // ── 로고 ──
   saveLogo(buf: Buffer) {
-    const { file, body } = prepareLogo(buf);
-    mkdirSync(this.logoDir, { recursive: true });
-    const path = `${this.logoDir}/${file}`;
-    if (!existsSync(path)) writeFileSync(path, body);
+    const { file, body, type } = prepareLogo(buf);
+    putBlob(`logos/${file}`, type, body);
     return file;
   }
 

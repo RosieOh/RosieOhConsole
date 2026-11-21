@@ -9,9 +9,11 @@ import { AppModule } from './app.module.js';
 import { BoardService } from './board/board.service.js';
 import { assertConfig, cfg } from './config.js';
 import { testbedProxy } from './testbed-proxy.js';
+import { closePersist, initPersist, persistInfo } from './persist.js';
 
 async function bootstrap() {
   assertConfig();
+  await initPersist();   // MariaDB 면 표를 만들고 문서를 읽는다 — 서비스들이 생성자에서 읽으므로 Nest 보다 먼저
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.set('trust proxy', 1);   // 리버스 프록시 뒤
   app.use(cookieParser());
@@ -43,7 +45,17 @@ async function bootstrap() {
     });
   }
 
+  // 끌 때 밀린 저장을 보내고 닫는다
+  let closing = false;
+  for (const sig of ['SIGTERM', 'SIGINT'] as const) process.once(sig, async () => {
+    if (closing) return;
+    closing = true;
+    await app.close().catch(() => undefined);
+    await closePersist().catch((e) => console.error('[저장] 닫기 실패:', e?.message));
+    process.exit(0);
+  });
+
   await app.listen(cfg.port, '0.0.0.0');
-  console.log(`rosie-console, 포트 ${cfg.port}, 주소 ${cfg.publicUrl}, GitHub ${cfg.githubWeb}/${cfg.owner}, 처음 관리자 ${cfg.admins.join(',')}`);
+  console.log(`rosie-console, 포트 ${cfg.port}, 주소 ${cfg.publicUrl}, GitHub ${cfg.githubWeb}/${cfg.owner}, 처음 관리자 ${cfg.admins.join(',')}, 조직 ${cfg.orgs.join(',') || '없음'}, 저장 ${persistInfo().driver}`);
 }
-bootstrap();
+bootstrap().catch((e) => { console.error('[시작 실패]', e?.message || e); process.exit(1); });

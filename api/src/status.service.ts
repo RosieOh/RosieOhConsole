@@ -1,5 +1,5 @@
+import { readDoc, writeDoc } from './persist.js';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { cfg } from './config.js';
 import { Endpoint, ServiceDef, loadRegistry } from './registry.js';
 
@@ -41,7 +41,7 @@ export class StatusService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
   // UP/DOWN 바뀐 순간만 남긴다(14일) — "테스트배드에서 몇 시간째 정상인가"(승격)·가동률
   private changes: Record<string, { at: string; up: boolean }[]> = (() => {
-    try { return JSON.parse(readFileSync(`${cfg.dataDir}/health-history.json`, 'utf8')); } catch { return {}; }
+    try { return readDoc('health-history') ?? {}; } catch { return {}; }
   })();
   private changesDirty = false;
 
@@ -103,11 +103,8 @@ export class StatusService implements OnModuleInit, OnModuleDestroy {
   private saveChanges() {
     if (!this.changesDirty) return;
     this.changesDirty = false;
-    try {
-      mkdirSync(cfg.dataDir, { recursive: true });
-      writeFileSync(`${cfg.dataDir}/health-history.json.tmp`, JSON.stringify(this.changes), 'utf8');
-      renameSync(`${cfg.dataDir}/health-history.json.tmp`, `${cfg.dataDir}/health-history.json`);
-    } catch (e: any) { console.warn('[상태] 기록을 쓰지 못했다:', e?.message); }
+    try { writeDoc('health-history', this.changes); }
+    catch (e: any) { console.warn('[상태] 기록을 쓰지 못했다:', e?.message); }
   }
 
   /** 지금 상태가 언제부터 이어졌나 + 24시간 안의 DOWN 횟수 */

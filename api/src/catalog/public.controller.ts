@@ -1,6 +1,6 @@
 import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { existsSync } from 'node:fs';
+import { getBlob } from '../persist.js';
 import { LOGO_FILE_RE, LOGO_TYPES, LogoExt } from './logos.js';
 import { CatalogService } from './catalog.service.js';
 
@@ -13,13 +13,14 @@ export class PublicController {
   catalogView() { return this.catalog.publicView(); }
 
   @Get('logos/:file')
-  logo(@Param('file') file: string, @Res() res: Response) {
-    if (!LOGO_FILE_RE.test(file) || !existsSync(`${this.catalog.logoDir}/${file}`)) throw new NotFoundException();
+  async logo(@Param('file') file: string, @Res() res: Response) {
+    const body = LOGO_FILE_RE.test(file) ? await getBlob(`logos/${file}`) : null;
+    if (!body) throw new NotFoundException();
     const ext = file.split('.').pop() as LogoExt;
     res.setHeader('Content-Type', LOGO_TYPES[ext]);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');   // 이름이 내용 해시라 바뀌지 않는다
-    res.sendFile(file, { root: this.catalog.logoDir });
+    res.end(body);
   }
 }

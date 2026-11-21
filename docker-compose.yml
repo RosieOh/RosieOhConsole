@@ -1,0 +1,35 @@
+# 로컬 실행 — MariaDB + 콘솔.
+#   docker compose up -d mariadb          DB 만(npm run dev 로 콘솔을 띄울 때, DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console)
+#   docker compose up -d --build          둘 다(.env 에 OAuth·세션 값 필요)
+services:
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: console
+      MARIADB_USER: console
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-console}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-console-root}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "127.0.0.1:${MARIADB_PORT:-3307}:3306"   # 이 컴퓨터에 MariaDB 가 이미 3306 을 쓰면 겹치지 않게 3307
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  console:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: mariadb://console:${MARIADB_PASSWORD:-console}@mariadb:3306/console
+    ports:
+      - "8087:8087"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  mariadb-data:

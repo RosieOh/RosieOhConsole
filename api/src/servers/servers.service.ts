@@ -1,5 +1,5 @@
+import { readDoc, writeDoc } from '../persist.js';
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { timingSafeEqual } from 'node:crypto';
 import { audit } from '../audit.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
@@ -40,19 +40,16 @@ export class ServersService {
 
   constructor() {
     try {
-      const j = JSON.parse(readFileSync(this.file, 'utf8'));
+      const j = readDoc<any>('servers') ?? {};
       this.hist = j.hist || {};
       for (const [k, v] of Object.entries<any>(j.latest || {})) this.latest.set(k, v);
     } catch { /* 처음 */ }
   }
-  private get file() { return `${cfg.dataDir}/servers.json`; }
   private save() {
     try {
-      mkdirSync(cfg.dataDir, { recursive: true });
       // 로그는 저장하지 않는다(점검 결과의 logs 는 뺀다)
       const latest = Object.fromEntries([...this.latest].map(([k, v]) => [k, { ...v, probe: v.probe ? { ...v.probe, logs: undefined } : null }]));
-      writeFileSync(this.file + '.tmp', JSON.stringify({ hist: this.hist, latest }), 'utf8');
-      renameSync(this.file + '.tmp', this.file);
+      writeDoc('servers', { hist: this.hist, latest });
     } catch (e: any) { console.warn('[서버] 기록을 쓰지 못했다:', e?.message); }
   }
 

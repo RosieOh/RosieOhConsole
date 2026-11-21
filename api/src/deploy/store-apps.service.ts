@@ -1,5 +1,5 @@
+import { readDoc, writeDoc } from '../persist.js';
 import { Injectable } from '@nestjs/common';
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { cfg, repoUrl as urlOf, full } from '../config.js';
 import { ghJson } from '../github.js';
@@ -30,20 +30,16 @@ export class StoreAppsService {
 
   constructor(private readonly catalog: CatalogService) {}
 
-  private get file() { return `${cfg.dataDir}/store-readings.json`; }
   private async load() {
     if (this.loaded) return;
     this.loaded = true;
-    try { for (const [k, v] of Object.entries(JSON.parse(await readFile(this.file, 'utf8')))) this.lanes.set(k, v as any); } catch { /* 처음 */ }
+    try { for (const [k, v] of Object.entries(readDoc<Record<string, any>>('store-readings') ?? {})) this.lanes.set(k, v); } catch { /* 처음 */ }
   }
   private save() {
     clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(async () => {
-      try {
-        await mkdir(cfg.dataDir, { recursive: true });
-        await writeFile(this.file + '.tmp', JSON.stringify(Object.fromEntries(this.lanes)), 'utf8');
-        await rename(this.file + '.tmp', this.file);
-      } catch (e: any) { console.warn('[스토어 앱] 기록 캐시를 쓰지 못했다:', e?.message); }
+    this.saveTimer = setTimeout(() => {
+      try { writeDoc('store-readings', Object.fromEntries(this.lanes)); }
+      catch (e: any) { console.warn('[스토어 앱] 기록 캐시를 쓰지 못했다:', e?.message); }
     }, 2000);
   }
 

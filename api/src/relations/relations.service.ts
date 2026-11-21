@@ -1,5 +1,5 @@
+import { readDoc, writeDoc } from '../persist.js';
 import { BadRequestException, ConflictException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { audit } from '../audit.js';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { cfg, full } from '../config.js';
@@ -44,7 +44,6 @@ export class RelationsService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly catalog: CatalogService) {}
 
-  private get scanFile() { return `${cfg.dataDir}/relations-scan.json`; }
 
   async onModuleInit() {
     await this.load();
@@ -59,13 +58,9 @@ export class RelationsService implements OnModuleInit, OnModuleDestroy {
   private async load() {
     if (this.loaded) return;
     this.loaded = true;
-    try { this.scan = JSON.parse(await readFile(this.scanFile, 'utf8')); } catch { /* 처음 */ }
+    try { this.scan = readDoc('relations-scan') ?? this.scan; } catch { /* 처음 */ }
   }
-  private async save() {
-    await mkdir(cfg.dataDir, { recursive: true });
-    await writeFile(this.scanFile + '.tmp', JSON.stringify(this.scan), 'utf8');
-    await rename(this.scanFile + '.tmp', this.scanFile);
-  }
+  private async save() { writeDoc('relations-scan', this.scan); }
 
   /** 단서를 짝지을 기준 — 카탈로그의 운영·테스트배드 주소 + 인프라 호스트 */
   known(): Known {

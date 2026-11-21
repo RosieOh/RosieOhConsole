@@ -1,4 +1,5 @@
 import { cfg } from './config.js';
+import { persistInfo } from './persist.js';
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthGuard } from './auth/auth.guard.js';
@@ -10,7 +11,7 @@ export class AppController {
 
   // 프록시·배포 헬스 확인용 — 로그인 없이
   @Get('health')
-  health() { return { ok: true }; }
+  health() { const p = persistInfo(); return { ok: true, storage: p.driver, ...(p.error ? { storageError: p.error } : {}) }; }
 
   @UseGuards(AuthGuard)
   @Get('status')
