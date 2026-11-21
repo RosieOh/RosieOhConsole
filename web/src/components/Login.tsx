@@ -1,6 +1,5 @@
 import { Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import LiquidGlass from 'liquid-glass-react';
 import { api, passwordProblem } from '../api';
 import { applyTheme, currentTheme } from '../theme';
 import { LiquidBg } from './LiquidBg';
@@ -27,41 +26,31 @@ export function GithubMark({ size = 16 }: { size?: number }) {
   );
 }
 
-/** 첫 화면 왼쪽 소개 — 넓은 화면에서만 보인다(좁으면 3D 고리가 그 자리를 채운다) */
-function Hero() {
-  return (
-    <section className="auth-hero" aria-label="소개">
-      <span className="auth-kicker">RosieOh · Console</span>
-      <h1>저장소부터 배포까지,<br />한 화면에서.</h1>
-      <p>GitHub 저장소 90개와 조직 프로젝트의 배포 흐름, 러너, 서버, 시크릿을 Rosie 콘솔 하나로 봅니다.</p>
-      <ul>
-        <li>서비스 카탈로그와 배포 현황</li>
-        <li>GitHub Actions 배포 흐름 도식</li>
-        <li>회원·권한과 감사 기록</li>
-      </ul>
-    </section>
-  );
-}
-
-/** 로그인·회원가입 공통 틀 — 3D 배경(안 되면 오로라) + 유리 카드 + 테마 버튼. hero 면 왼쪽 소개를 두고 카드는 오른쪽으로 */
-export function AuthFrame({ children, width = 520, hero = false }: { children: React.ReactNode; width?: number; hero?: boolean }) {
+/**
+ * 로그인·회원가입 공통 틀 — 화면을 둘로 나눈다.
+ *   왼쪽: 은은한 3D(로고의 고리·점, 몇 개의 고리·입자) + 짧은 소개. WebGL 이 안 되면 오로라 배경
+ *   오른쪽: 단정한 패널 위에 입력창(세로 가운데). 좁은 화면은 3D 가 위쪽 띠로 줄고 입력창이 아래로
+ */
+export function AuthFrame({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(() => currentTheme() === 'dark');
-  const [flat, setFlat] = useState(false);   // WebGL 이 안 되면 기존 오로라
+  const [flat, setFlat] = useState(false);
   const flip = () => { const next = dark ? 'light' : 'dark'; applyTheme(next); setDark(!dark); };
   return (
-    <div className={'login-wrap auth-3d' + (hero ? ' has-hero' : '')}>
-      {flat ? <LiquidBg /> : <Scene3D focusX={hero ? 0.485 : 0.17} onFail={() => setFlat(true)} />}
-      {hero && <Hero />}
-      <button className="login-theme" onClick={flip} aria-label="테마 바꾸기" title={dark ? '밝게' : '어둡게'}>
-        {dark ? <Sun size={17} /> : <Moon size={17} />}
-      </button>
-      {/* 이 컴포넌트는 transform: translate(-50%,-50%) 를 항상 걸기 때문에
-          position 과 top/left 를 반드시 넘겨야 한다(안 넘기면 내부 레이어가 나란히 흐른다).
-          형제로 뿌리는 림/음영 레이어는 styles.css 에서 끄고 테두리를 직접 그린다. */}
-      <LiquidGlass className="login-glass" cornerRadius={28} padding="40px 44px 34px" displacementScale={68} blurAmount={0.06}
-        saturation={135} aberrationIntensity={2} elasticity={0.14} style={{ position: 'absolute', top: '50%', left: 'var(--auth-card-x, 50%)', width: `min(${width}px, calc(100vw - 32px))` }}>
-        <div className="login-box">{children}</div>
-      </LiquidGlass>
+    <div className="auth-split">
+      <aside className="auth-visual" aria-hidden="true">
+        {flat ? <LiquidBg /> : <Scene3D focusX={0.56} focusY={0.4} onFail={() => setFlat(true)} />}
+        <div className="auth-visual-copy">
+          <span className="auth-kicker">RosieOh · Console</span>
+          <h1>저장소부터 배포까지,<br />한 화면에서.</h1>
+          <p>GitHub 저장소와 조직 프로젝트의 배포 흐름, 러너, 서버를 Rosie 콘솔 하나로.</p>
+        </div>
+      </aside>
+      <main className="auth-panel">
+        <button className="auth-theme" onClick={flip} aria-label="테마 바꾸기" title={dark ? '밝게' : '어둡게'}>
+          {dark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+        <div className="auth-panel-in">{children}</div>
+      </main>
     </div>
   );
 }
@@ -82,7 +71,7 @@ export function Login() {
   }
 
   return (
-    <AuthFrame hero width={460}>
+    <AuthFrame>
       <span className="login-brand brand-logo" aria-label="RosieOh" />
       <h2>Rosie 콘솔</h2>
       <p>콘솔 계정이나 GitHub 계정으로 로그인합니다.</p>
@@ -93,10 +82,10 @@ export function Login() {
         <label className="fld"><span>비밀번호</span>
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         {err && <div className="err" role="alert">{err}</div>}
-        <button className="login-cta" type="submit" disabled={busy}>{busy ? '확인 중…' : '로그인'}</button>
+        <button className="auth-btn" type="submit" disabled={busy}>{busy ? '확인 중…' : '로그인'}</button>
       </form>
       <div className="auth-or"><span>또는</span></div>
-      <a className="login-cta auth-gh" href="/dashapi/login"><GithubMark />GitHub 으로 로그인</a>
+      <a className="auth-btn auth-gh" href="/dashapi/login"><GithubMark />GitHub 으로 로그인</a>
       <div className="auth-links">
         <a href="#signup">회원가입</a>
         <a className="login-alt" href="/apk">APK 만 받기 <span>로그인 없이</span></a>
@@ -129,11 +118,11 @@ export function Signup() {
   }
 
   if (done) return (
-    <AuthFrame width={460}>
+    <AuthFrame>
       <span className="login-brand brand-logo" aria-label="RosieOh" />
       <h2>가입 신청을 받았습니다</h2>
       <p><b>{done}</b> 계정은 관리자가 승인하면 로그인할 수 있습니다. 승인되면 다시 와서 로그인하세요.</p>
-      <a className="login-cta" href="#">로그인 화면으로</a>
+      <a className="auth-btn" href="#">로그인 화면으로</a>
     </AuthFrame>
   );
 
@@ -159,10 +148,10 @@ export function Signup() {
         </div>
         <div className="auth-hint" style={{ marginTop: -4 }}>비밀번호는 영문과 숫자를 섞어 8자 이상.</div>
         {err && <div className="err" role="alert">{err}</div>}
-        <button className="login-cta" type="submit" disabled={busy}>{busy ? '보내는 중…' : '가입 신청'}</button>
+        <button className="auth-btn" type="submit" disabled={busy}>{busy ? '보내는 중…' : '가입 신청'}</button>
       </form>
       <div className="auth-or"><span>또는</span></div>
-      <a className="login-cta auth-gh" href="/dashapi/login"><GithubMark />GitHub 계정으로 가입 신청</a>
+      <a className="auth-btn auth-gh" href="/dashapi/login"><GithubMark />GitHub 계정으로 가입 신청</a>
       <div className="auth-links"><a href="#">이미 계정이 있습니다, 로그인</a></div>
     </AuthFrame>
   );
