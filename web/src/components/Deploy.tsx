@@ -263,7 +263,7 @@ function EnvCard({ c, t, canRollback, deployer, admin, onDone }: { c: CatalogCom
         <span className="scard-icon">{t.env === 'prod' ? <RocketI size={17} /> : <FlaskConical size={17} />}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="scard-title">{ENV_LABEL[t.env]}</div>
-          <div className="scard-sub">{t.kamal}, {t.dest}</div>
+          <div className="scard-sub">{t.kamal ? `${t.kamal}, ${t.dest}` : `GitHub ${t.dest}`}</div>
         </div>
         {last && <StateBadge s={last.state} />}
       </div>

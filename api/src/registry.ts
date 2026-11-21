@@ -24,6 +24,9 @@ export interface DeployTrack {
   compose?: boolean;            // Kamal 이 아닌 docker compose 운영(채점 서버) — 로그의 이름 규칙만 같고 <kamal>-web- 컨테이너는 없다.
                                 //   서버 화면의 컨테이너 경고, 로그, 재시작 대상에서 뺀다
   workflows: string[];          // 배포·되돌리기 워크플로 파일(.github/workflows/…)
+  // GitHub Deployments 환경 이름(github-pages·Production 등). 있으면 Kamal 로그 대신 그 환경의 배포 기록·상태를 읽는다
+  //   — GitHub Pages·Vercel 처럼 기본 브랜치 push 가 곧 배포인 저장소. kamal·workflows 는 비우고, 되돌리기·운영 반영은 없다
+  environment?: string;
   rollback?: {
     workflow: string; ref: string;
     inputs: Record<string, string>;   // {version}·{confirm} 를 채운다

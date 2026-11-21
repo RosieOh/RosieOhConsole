@@ -1,5 +1,5 @@
 import type { ComponentDef, ComponentKind, NodeDef } from './types.js';
-import type { Endpoint } from '../registry.js';
+import type { DeployTrack, Endpoint } from '../registry.js';
 
 // 카탈로그 기본값 — 그룹 → 프로젝트 → 구성요소. RosieOh 의 저장소(포크·프로필 저장소 제외) + 조직 저장소('<조직>/<저장소>'), 2026-11-21 기준.
 // 이름·로고·소속·순서는 화면(설정 › 서비스 카탈로그)에서 바꾼다(편집값이 이긴다). 새 저장소는 화면에서 추가해도 된다.
@@ -154,5 +154,22 @@ export const DEFAULT_NODES: NodeDef[] = TREE.flatMap(([gid, gname, projects], gi
   ...projects.map(([pid, pname], pi) => ({ id: pid, type: 'project' as const, name: pname, parent: gid, order: (pi + 1) * 10 })),
 ]);
 
+// 실제로 배포되는 구성요소 — GitHub Deployments 기록이 있는 것(2026-11-21 확인). 운영 헬스 + 배포 트랙(환경 이름)
+// 고칠 때는 구성요소 key 로. TREE 와 따로 두면 종류·이름을 바꿀 때 서로 부딪히지 않는다
+const ghDeploy = (environment: string): DeployTrack => ({ kamal: '', dest: environment, workflows: [], environment });
+const LIVE: Record<string, { prod: Endpoint; env: string }> = {
+  daedong: { prod: site('https://rosieoh.github.io/DaeDongYeoJiDo/'), env: 'github-pages' },
+  betweenthelines: { prod: site('https://rosieoh.github.io/BetweenTheLines/'), env: 'github-pages' },
+  rosietechblog: { prod: site('https://rosiesblog.vercel.app'), env: 'Production' },   // Vercel
+  'chagok-report': { prod: site('https://rosieoh.github.io/chagok-report/'), env: 'github-pages' },
+  'otel-canary': { prod: site('https://rosieoh.github.io/otel-canary/'), env: 'github-pages' },
+  hoonshop: { prod: site('https://rosieoh.github.io/hoonShop/'), env: 'github-pages' },
+  leeeung: { prod: site('https://rosieoh.github.io/LeeEung_test/'), env: 'github-pages' },
+};
+
 export const DEFAULT_COMPONENTS: ComponentDef[] = TREE.flatMap(([, , projects]) => projects.flatMap(([pid, , comps]) =>
-  comps.map(([key, name, kind, repo, extra], ci) => ({ key, name, kind, repo, parent: pid, order: (ci + 1) * 10, ...extra }))));
+  comps.map(([key, name, kind, repo, extra], ci) => {
+    const live = LIVE[key];
+    return { key, name, kind, repo, parent: pid, order: (ci + 1) * 10, ...extra,
+      ...(live ? { prod: live.prod, deploy: { prod: ghDeploy(live.env) } } : {}) };
+  })));
