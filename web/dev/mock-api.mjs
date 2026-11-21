@@ -143,7 +143,8 @@ const LOGS = [
 ];
 
 const ROUTES = [
-  ['GET', /^\/me$/, () => ({ authenticated: true, login: 'RosieOh', role: 'admin', admin: true, deployer: true })],
+  // MOCK_ANON=1 이면 로그인 전 화면(로그인·회원가입)을 본다
+  ['GET', /^\/me$/, () => (process.env.MOCK_ANON === '1' ? { authenticated: false } : { authenticated: true, login: 'RosieOh', name: 'Rosie Oh', role: 'admin', admin: true, deployer: true })],
   ['POST', /^\/logout$/, () => ({ ok: true })],
   ['GET', /^\/users$/, () => ({ users: LOGINS.map((l) => ({ login: l, fullName: l, avatar: '' })) })],
   ['GET', /^\/catalog$/, () => ({ rev: 1, roots: ROOTS, components: COMPS, warning: null })],
@@ -300,4 +301,37 @@ ROUTES.push(
   ['GET', /^\/board\/api\/repos$/, () => ({ tracked: [...new Set(CARD_TITLES.map((c) => c[0]))].map((repo) => ({ repo, type: 'backend' })),
     results: [], types: { backend: '백엔드', web: '웹', app: '기기앱' }, org: 'RosieOh' })],
   ['POST', /^\/board\/api\/(move|blocked|follow|state|viewers|repos|report)$/, () => ({ ok: true, labels: [], blocked: true })],
+);
+
+// ── 회원(로그인·가입·마이페이지·회원 관리) ─────────────────
+const ACCOUNT = {
+  login: 'rosieoh', name: 'Rosie Oh', email: 'rosie@example.com', github: 'RosieOh', status: 'active', createdAt: iso(60 * 24 * 30),
+  via: 'github', lastLoginAt: iso(3), sv: 0, hasPassword: false, role: 'admin', root: true,
+  history: [
+    { at: iso(3), via: 'github', ip: '203.0.113.7', ok: true },
+    { at: iso(60 * 26), via: 'github', ip: '203.0.113.7', ok: true },
+    { at: iso(60 * 50), via: 'password', ip: '198.51.100.4', ok: false, reason: '비밀번호 틀림' },
+  ],
+};
+const MEMBER = (login, name, status, via, extra = {}) => ({
+  login, name, email: `${login}@example.com`, status, createdAt: iso(60 * 24 * (3 + login.length)), via, sv: 0,
+  hasPassword: via === 'signup', role: 'viewer', root: false, lastFail: null, ...extra,
+});
+const ACCOUNTS = [
+  { ...ACCOUNT, lastFail: null },
+  MEMBER('alice', '앨리스', 'active', 'signup', { lastLoginAt: iso(90), role: 'deployer' }),
+  MEMBER('bob', '밥', 'pending', 'signup'),
+  MEMBER('carol', 'carol', 'pending', 'github', { github: 'carol', email: '' }),
+  MEMBER('dave', '데이브', 'suspended', 'signup', { lastLoginAt: iso(60 * 24 * 4) }),
+];
+ROUTES.push(
+  ['POST', /^\/auth\/login$/, () => ({ ok: true, login: 'rosieoh' })],
+  ['POST', /^\/auth\/signup$/, () => ({ ok: true, login: 'newbie', status: 'pending' })],
+  ['GET', /^\/account$/, () => ACCOUNT],
+  ['PUT', /^\/account$/, () => ACCOUNT],
+  ['POST', /^\/account\/(password|logout-others|withdraw)$/, () => ({ ok: true })],
+  ['DELETE', /^\/account\/github$/, () => ({ ok: true })],
+  ['GET', /^\/accounts$/, () => ({ accounts: ACCOUNTS })],
+  ['POST', /^\/accounts\/[^/]+\/reset-password$/, () => ({ ok: true, tempPassword: 'tmpX9q2Lm7a' })],
+  ['POST', /^\/accounts\/[^/]+\/[a-z-]+$/, () => ({ ok: true })],
 );

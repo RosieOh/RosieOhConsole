@@ -46,11 +46,22 @@ export const api = {
   secrets: (refresh = false) => j('GET', '/secrets' + (refresh ? '?refresh=1' : '')) as Promise<SecretsOverview>,
   secretSet: (b: SecretWrite & { value: string; description?: string }) => j('POST', '/secrets/set', b) as Promise<{ ok: boolean; created: boolean; usedBy: SecretUsage[] }>,
   secretDelete: (b: SecretWrite) => j('POST', '/secrets/delete', b) as Promise<{ ok: boolean; usedBy: SecretUsage[] }>,
+  // 회원 — 로그인·가입(로그인 전), 마이페이지(본인), 회원 관리(관리자)
+  passwordLogin: (login: string, password: string) => j('POST', '/auth/login', { login, password }) as Promise<{ ok: boolean; login: string }>,
+  signup: (b: { login: string; name: string; email: string; password: string }) => j('POST', '/auth/signup', b) as Promise<{ ok: boolean; login: string; status: AccountStatus }>,
+  account: () => j('GET', '/account') as Promise<MyAccount>,
+  updateAccount: (b: { name?: string; email?: string }) => j('PUT', '/account', b) as Promise<AccountInfo>,
+  changePassword: (b: { current?: string; next: string }) => j('POST', '/account/password', b) as Promise<{ ok: boolean }>,
+  logoutOthers: () => j('POST', '/account/logout-others') as Promise<{ ok: boolean }>,
+  unlinkGithub: () => j('DELETE', '/account/github') as Promise<{ ok: boolean }>,
+  withdraw: (b: { password?: string; confirm?: string }) => j('POST', '/account/withdraw', b) as Promise<{ ok: boolean }>,
+  accounts: () => j('GET', '/accounts') as Promise<{ accounts: AdminAccount[] }>,
+  accountAction: (login: string, action: AccountAction) => j('POST', `/accounts/${encodeURIComponent(login)}/${action}`) as Promise<{ ok: boolean; account?: AccountInfo; tempPassword?: string }>,
   toolReadme: (name: string) => j('GET', `/tools/${encodeURIComponent(name)}/readme`) as Promise<{ markdown: string }>,
 };
 
 export type Role = 'admin' | 'deployer' | 'viewer';
-export type Me = { authenticated: false } | { authenticated: true; login: string; role: Role; admin: boolean; deployer: boolean };
+export type Me = { authenticated: false } | { authenticated: true; login: string; name?: string; role: Role; admin: boolean; deployer: boolean };
 
 export interface EnvStatus {
   up: boolean; db_status?: string | null; redis_status?: string | null; latency_ms?: number; checked_at: string; error?: string; link: string;
@@ -301,4 +312,27 @@ export type FlagSummary = Record<string, { env: FlagEnv; on: number }[]>;
 export interface FlagsOverview {
   services: { comp: string; envs: { env: FlagEnv; configured: boolean; ok: boolean; error?: string; loadedAt?: string | null }[]; rows: FlagRow[] }[];
   updatedAt: string;
+}
+
+// 회원 — api/src/accounts/accounts.ts 의 publicAccount 와 같은 모양
+export type AccountStatus = 'pending' | 'active' | 'suspended' | 'rejected';
+export type AccountAction = 'approve' | 'reject' | 'suspend' | 'activate' | 'reset-password' | 'delete';
+export interface AccountInfo {
+  login: string; name: string; email: string; github?: string; status: AccountStatus;
+  createdAt: string; via: 'signup' | 'github' | 'admin'; decidedBy?: string; decidedAt?: string; lastLoginAt?: string;
+  sv: number; hasPassword: boolean; role: Role; root: boolean;
+}
+export interface LoginEvent { at: string; via: 'password' | 'github'; ip: string; ok: boolean; reason?: string }
+export interface MyAccount extends AccountInfo { history: LoginEvent[] }
+export interface AdminAccount extends AccountInfo { lastFail: LoginEvent | null }
+export const ACCOUNT_STATUS: Record<AccountStatus, [string, string]> = {
+  pending: ['승인 대기', 'amber'], active: ['사용 중', 'green'], suspended: ['정지', 'red'], rejected: ['거절', 'muted'],
+};
+/** 비밀번호 규칙 — 서버(passwordProblem)와 같게 */
+export function passwordProblem(pw: string, login = ''): string | null {
+  if (pw.length < 8) return '비밀번호는 8자 이상입니다';
+  if (pw.length > 72) return '비밀번호는 72자 이하입니다';
+  if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw)) return '비밀번호에 영문과 숫자를 함께 넣으세요';
+  if (login && pw.toLowerCase().includes(login.trim().toLowerCase())) return '비밀번호에 아이디를 넣지 마세요';
+  return null;
 }
