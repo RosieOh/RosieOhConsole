@@ -1,7 +1,7 @@
 import type { ComponentDef, ComponentKind, NodeDef } from './types.js';
 import type { Endpoint } from '../registry.js';
 
-// 카탈로그 기본값 — 그룹 → 프로젝트 → 구성요소. RosieOh 의 저장소(포크·프로필 저장소 제외, 2026-11-21 기준).
+// 카탈로그 기본값 — 그룹 → 프로젝트 → 구성요소. RosieOh 의 저장소(포크·프로필 저장소 제외) + 조직 저장소('<조직>/<저장소>'), 2026-11-21 기준.
 // 이름·로고·소속·순서는 화면(설정 › 서비스 카탈로그)에서 바꾼다(편집값이 이긴다). 새 저장소는 화면에서 추가해도 된다.
 // 기술 연결(헬스 주소·배포 워크플로·되돌리기)은 여기 코드로 적는다 — 지금은 공개 사이트가 있는 것만 운영 헬스를 단다.
 //
@@ -136,6 +136,15 @@ const TREE: G[] = [
       ['mendorong', '멘도롱 대학', 'web', 'Mendorong_Univ'],
       ['elderlinker', '멋사 해커톤 ElderLinker', 'web', 'likelion-hackathon-elderlinker'],
       ['leeeung', 'LeeEung 테스트', 'web', 'LeeEung_test'],
+    ]],
+    // 조직 MarioChunjaeIT(GITHUB_ORGS 에 넣어야 실행 기록 등이 읽힌다) — 천재교육 풀스택 과정 2기 팀 '마리오'
+    ['mario', '천재교육 팀 마리오', [
+      ['mario-proj01', '1차 팀 프로젝트', 'web', 'MarioChunjaeIT/Chunjae_Team_Proj01'],
+      ['mario-proj02', '2차 팀 프로젝트', 'web', 'MarioChunjaeIT/Chunjae_Team_Proj02'],
+      ['mario-backup-0831', '2차 백업 (08-31)', 'web', 'MarioChunjaeIT/BackUp_Pro02_20230831'],
+      ['mario-backup-0901', '2차 최종본 백업 (09-01)', 'web', 'MarioChunjaeIT/BackUp_Pro02_20230901'],
+      ['mario-yeeun', 'Yeeun 저장소', 'web', 'MarioChunjaeIT/Yeeun_GithubRepo'],
+      ['mario-bk', 'BK 저장소', 'backend', 'MarioChunjaeIT/BK_GithubRepo'],
     ]],
   ]],
 ];
