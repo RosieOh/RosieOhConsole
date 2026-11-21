@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { timingSafeEqual } from 'node:crypto';
 import { audit } from '../audit.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
-import { cfg, repoUrl } from '../config.js';
+import { cfg, repoUrl, full } from '../config.js';
 import { ghFetch, ghJson } from '../github.js';
 import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { addrOf } from '../infra/names.js';
@@ -119,7 +119,7 @@ export class ServersService {
     const busy = this.pending.get(`${id}:${action}`);
     if (busy && Date.now() - busy.at < 5 * 60_000) return { ok: true, already: true };
     const inputs: Record<string, string> = { action, target, lines: String(Math.min(Math.max(lines, 50), 2000)), confirm: action === 'restart' ? confirm : '' };
-    const res = await ghFetch(`repos/${cfg.owner}/${d.repo}/actions/workflows/${WORKFLOW}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: await this.ref(d.repo), inputs }) }, cfg.githubWriteToken);
+    const res = await ghFetch(`repos/${full(d.repo)}/actions/workflows/${WORKFLOW}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: await this.ref(d.repo), inputs }) }, cfg.githubWriteToken);
     const ok = res.status === 204 || res.ok;
     if (action === 'restart') await audit({ login, action: 'server.restart', target: `${id} ${target}`, detail: ok ? '요청' : `HTTP ${res.status}`, ok, url: `${repoUrl(d.repo)}/actions?workflow=${WORKFLOW}` });
     if (!ok) throw new ServiceUnavailableException(`GitHub 이 실행을 받지 않았습니다(HTTP ${res.status}), ${d.repo} 에 probe.yml 이 있는지 확인하세요`);
@@ -129,7 +129,7 @@ export class ServersService {
 
   private refs = new Map<string, string>();
   private async ref(repo: string) {
-    if (!this.refs.has(repo)) this.refs.set(repo, (await ghJson<any>(`repos/${cfg.owner}/${repo}`))?.default_branch || 'main');
+    if (!this.refs.has(repo)) this.refs.set(repo, (await ghJson<any>(`repos/${full(repo)}`))?.default_branch || 'main');
     return this.refs.get(repo)!;
   }
 }

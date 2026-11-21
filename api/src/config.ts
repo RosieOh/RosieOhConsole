@@ -10,6 +10,8 @@ export const cfg = {
   githubWeb: (process.env.GITHUB_WEB_URL || 'https://github.com').replace(/\/$/, ''),
   // 콘솔이 다루는 저장소의 주인(사용자 계정)
   owner: process.env.GITHUB_OWNER || 'RosieOh',
+  // 함께 다룰 GitHub 조직(쉼표로 여럿). 조직 저장소는 카탈로그 등에서 '<조직>/<저장소>' 로 적는다
+  orgs: list(process.env.GITHUB_ORGS),
   // 읽기 토큰(fine-grained: Metadata·Contents·Actions read). 없으면 공개 API 한도(시간당 60회)로 돈다
   githubToken: process.env.GITHUB_TOKEN || '',
   // 쓰기 토큰(Actions write·Contents write·Pull requests write) — 되돌리기·운영 반영 등. 없으면 그 버튼이 꺼진다
@@ -26,7 +28,11 @@ export const cfg = {
 };
 
 export const secureCookie = () => cfg.publicUrl.startsWith('https://');
-export const repoUrl = (repo: string) => `${cfg.githubWeb}/${cfg.owner}/${repo}`;
+/** 저장소 이름 → '<주인>/<저장소>'. '/' 가 있으면(조직 저장소) 그대로 */
+export const full = (repo: string) => (repo.includes('/') ? repo : `${cfg.owner}/${repo}`);
+export const repoUrl = (repo: string) => `${cfg.githubWeb}/${full(repo)}`;
+/** 저장소 이름 검사 — '<저장소>' 또는 '<조직>/<저장소>' */
+export const REPO_RE = /^([A-Za-z0-9-]{1,39}\/)?[A-Za-z0-9._-]{1,100}$/;
 
 export function assertConfig() {
   const missing = (['oauthClientId', 'oauthClientSecret'] as const).filter((k) => !cfg[k]);

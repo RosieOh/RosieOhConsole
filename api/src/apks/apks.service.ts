@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { pathOf } from '../catalog/merge.js';
-import { cfg, repoUrl } from '../config.js';
+import { cfg, repoUrl, full } from '../config.js';
 import { ghJson, ghPaged } from '../github.js';
 import { readReleaseBody } from './release.js';
 import { ApkKind, hasReleases } from './apps.js';
@@ -69,8 +69,8 @@ export class ApksService {
       // 부모앱은 운영 릴리스를 보관함에서 내지 않으므로 프리릴리스만 읽는다(#175)
       // GitHub 은 프리릴리스 여부로 거르지 못한다 — 한 번에 받아 나눈다
       const [info, all] = await Promise.all([
-        ghJson<any>(`repos/${cfg.owner}/${repo}`),
-        ghJson<any[]>(`repos/${cfg.owner}/${repo}/releases?per_page=100`),
+        ghJson<any>(`repos/${full(repo)}`),
+        ghJson<any[]>(`repos/${full(repo)}/releases?per_page=100`),
       ]);
       const rels = withReleases ? (all || []).filter((r: any) => !r.prerelease).slice(0, KEEP) : [];
       const tests = (all || []).filter((r: any) => r.prerelease).slice(0, KEEP);
@@ -131,7 +131,7 @@ export class ApksService {
   private async history(repo: string, top: string) {
     const hit = this.verCache.get(repo);
     if (hit?.top === top) return hit;
-    const raw = await ghPaged<any>(`repos/${cfg.owner}/${repo}/commits?sha=${encodeURIComponent(top)}`, 50, 6);
+    const raw = await ghPaged<any>(`repos/${full(repo)}/commits?sha=${encodeURIComponent(top)}`, 50, 6);
     const commits = raw.map((c) => ({ sha: c.sha, message: c.commit?.message || '', date: c.commit?.author?.date || '' }));
     const h = { top, segs: splitVersions(commits, top).slice(0, 30), commits };
     this.verCache.set(repo, h);
@@ -181,8 +181,8 @@ export class ApksService {
     if (!hit) {
       const prev = r.releases[i + 1]?.tag ?? null;
       let commits: any[] = [];
-      if (prev) commits = (await ghJson<any>(`repos/${cfg.owner}/${repo}/compare/${encodeURIComponent(prev)}...${encodeURIComponent(tag)}`))?.commits ?? [];
-      else commits = (await ghJson<any[]>(`repos/${cfg.owner}/${repo}/commits?sha=${encodeURIComponent(tag)}&per_page=40`)) ?? [];
+      if (prev) commits = (await ghJson<any>(`repos/${full(repo)}/compare/${encodeURIComponent(prev)}...${encodeURIComponent(tag)}`))?.commits ?? [];
+      else commits = (await ghJson<any[]>(`repos/${full(repo)}/commits?sha=${encodeURIComponent(tag)}&per_page=40`)) ?? [];
       const cl = commits.map((c: any) => ({ sha: c.sha, message: c.commit?.message || '' }));
       hit = { changes: summarize(cl), base: prev, count: cl.length };
       this.changeCache.set(key, hit);
@@ -198,8 +198,8 @@ export class ApksService {
     if (!hit) {
       const head = t.commit ?? t.tag;
       let commits: any[] = [];
-      if (prev) commits = (await ghJson<any>(`repos/${cfg.owner}/${r.repo}/compare/${encodeURIComponent(prev.commit ?? prev.tag)}...${encodeURIComponent(head)}`))?.commits ?? [];
-      else commits = (await ghJson<any[]>(`repos/${cfg.owner}/${r.repo}/commits?sha=${encodeURIComponent(head)}&per_page=20`)) ?? [];
+      if (prev) commits = (await ghJson<any>(`repos/${full(r.repo)}/compare/${encodeURIComponent(prev.commit ?? prev.tag)}...${encodeURIComponent(head)}`))?.commits ?? [];
+      else commits = (await ghJson<any[]>(`repos/${full(r.repo)}/commits?sha=${encodeURIComponent(head)}&per_page=20`)) ?? [];
       const cl = commits.map((c: any) => ({ sha: c.sha, message: c.commit?.message || '' }));
       hit = { changes: summarize(cl), base: prev?.tag ?? null, count: cl.length };
       this.changeCache.set(key, hit);
@@ -233,7 +233,7 @@ export class ApksService {
       if (!r) return null;
       for (const rel of [...r.releases, ...r.tests]) {
         const a = rel.assets.find((x) => x.id === assetId);
-        if (a) return { repo, release: rel, asset: a, test: rel.prerelease, url: `${cfg.githubApi}/repos/${cfg.owner}/${repo}/releases/assets/${a.id}` };
+        if (a) return { repo, release: rel, asset: a, test: rel.prerelease, url: `${cfg.githubApi}/repos/${full(repo)}/releases/assets/${a.id}` };
       }
     }
     return null;

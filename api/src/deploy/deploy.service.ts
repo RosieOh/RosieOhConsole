@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { audit } from '../audit.js';
-import { cfg, repoUrl } from '../config.js';
+import { cfg, repoUrl, full } from '../config.js';
 import { DeployTrack, ServiceDef } from '../registry.js';
 import { EnvKey, StatusService } from '../status.service.js';
 import { RunReading, VERSION_RE, fillInputs, readKamalJobs } from './kamal-log.js';
@@ -79,7 +79,7 @@ export class DeployService {
     const k = `${repo}/${wf}`;
     const hit = this.runs.get(k);
     if (!force && hit && Date.now() - hit.at < RUNS_TTL_MS) return hit.list;
-    const j = await this.json(`repos/${cfg.owner}/${repo}/actions/workflows/${encodeURIComponent(wf)}/runs?per_page=${RUNS_PER_WORKFLOW}`);
+    const j = await this.json(`repos/${full(repo)}/actions/workflows/${encodeURIComponent(wf)}/runs?per_page=${RUNS_PER_WORKFLOW}`);
     const list = (j?.workflow_runs || []).map((r: any) => ({ ...r, _wf: wf }));
     this.runs.set(k, { at: Date.now(), list });
     return list;
@@ -90,10 +90,10 @@ export class DeployService {
     const k = `${repo}#${run.id}`;
     const hit = this.readings.get(k);
     if (hit) return hit;
-    const jobs: any[] = (await this.json(`repos/${cfg.owner}/${repo}/actions/runs/${run.id}/jobs`))?.jobs || [];
+    const jobs: any[] = (await this.json(`repos/${full(repo)}/actions/runs/${run.id}/jobs`))?.jobs || [];
     const logs: { log: string; ok: boolean }[] = [];
     for (const job of jobs) {
-      const res = await this.api(`repos/${cfg.owner}/${repo}/actions/jobs/${job.id}/logs`);
+      const res = await this.api(`repos/${full(repo)}/actions/jobs/${job.id}/logs`);
       if (res.ok) logs.push({ log: await res.text(), ok: job.conclusion === 'success' });   // 재사용 워크플로를 부르는 쪽 작업은 로그가 없다(404)
     }
     const r = readKamalJobs(logs, run._wf);
@@ -163,7 +163,7 @@ export class DeployService {
     }
     // 셀프 호스티드 러너(저장소마다 — 토큰에 저장소 관리 권한이 있어야 보인다). 호스티드 러너는 목록이 없다
     const repos = [...new Set(services.map((x) => x.repo))];
-    const runners = (await Promise.all(repos.map((r) => this.json(`repos/${cfg.owner}/${r}/actions/runners`).catch(() => null))))
+    const runners = (await Promise.all(repos.map((r) => this.json(`repos/${full(r)}/actions/runners`).catch(() => null))))
       .flatMap((j) => j?.runners || [])
       .map((r: any) => ({ name: r.name, status: r.status, busy: !!r.busy, labels: (r.labels || []).map((l: any) => l.name) }));
     // 손봐야 할 실패 — 서비스·환경마다 마지막 결과가 실패인 것(뒤에 성공하면 빠진다)
@@ -202,7 +202,7 @@ export class DeployService {
     const k = `${repo}:${from}...${to}`;
     const hit = this.between.get(k);
     if (hit) return hit;
-    const cmp = await ghJson<any>(`repos/${cfg.owner}/${repo}/compare/${from}...${to}`).catch(() => null);
+    const cmp = await ghJson<any>(`repos/${full(repo)}/compare/${from}...${to}`).catch(() => null);
     if (!cmp) return null;
     const list = summarize((cmp.commits || []).map((c: any) => ({ sha: c.sha, message: c.commit?.message || '' }))).filter((c) => !isReleaseTitle(c.title));
     this.between.set(k, list);
@@ -240,7 +240,7 @@ export class DeployService {
 
     const target = `${s.repo} ${env}(${t.kamal})`;
     const inputs = fillInputs(t.rollback.inputs, { version, confirm: b.confirm || '' });
-    const res = await this.api(`repos/${cfg.owner}/${s.repo}/actions/workflows/${encodeURIComponent(t.rollback.workflow)}/dispatches`,
+    const res = await this.api(`repos/${full(s.repo)}/actions/workflows/${encodeURIComponent(t.rollback.workflow)}/dispatches`,
       { method: 'POST', body: JSON.stringify({ ref: t.rollback.ref, inputs }) }, cfg.githubWriteToken);
     const url = `${repoUrl(s.repo)}/actions?workflow=${encodeURIComponent(t.rollback.workflow)}`;
     const ok = res.status === 204 || res.ok;

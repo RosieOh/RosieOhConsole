@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { audit } from '../audit.js';
-import { cfg } from '../config.js';
+import { cfg, full, REPO_RE } from '../config.js';
 import { ghFetch, ghJson, ghPaged, ownerRepos } from '../github.js';
 import {
   Perm, RefKind, TeamInfo, TemplateUse, Usage, WorkflowFile, canManage, canUse, checkName, explainPerm, repoUsage, unitPerm,
@@ -30,7 +30,6 @@ export interface Overview {
 
 const TTL = 10 * 60 * 1000;
 const POOL = 6;
-const REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const VALUE_MAX = 64 * 1024;
 
 async function pool<T, R>(list: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
@@ -64,7 +63,7 @@ export class SecretsService {
 
   private async writeAccess(probeRepo?: string): Promise<Overview['write']> {
     if (!cfg.githubWriteToken) return { repo: false, org: false, reason: '콘솔에 쓰기 토큰(GITHUB_WRITE_TOKEN)이 없습니다' };
-    const r = probeRepo ? (await ghFetch(`repos/${cfg.owner}/${probeRepo}/actions/variables`, {}, cfg.githubWriteToken)).status : 0;
+    const r = probeRepo ? (await ghFetch(`repos/${full(probeRepo)}/actions/variables`, {}, cfg.githubWriteToken)).status : 0;
     return { repo: r === 200, org: false, reason: r === 200 ? null : '쓰기 토큰에 저장소 Secrets·Variables 권한이 없습니다' };
   }
 
@@ -96,13 +95,13 @@ export class SecretsService {
       const view: RepoView = { repo: name, archived: !!r.archived, defaultBranch: ref, workflows: [], templates: [], templateFiles: [], people: [] };
       try {
         const [secrets, vars, collabs, ...dirs] = await Promise.all([
-          ghPaged<any>(`repos/${org}/${name}/actions/secrets`, 100, 5, 'secrets').catch(() => []),
-          ghPaged<any>(`repos/${org}/${name}/actions/variables`, 30, 5, 'variables').catch(() => []),
-          ghPaged<any>(`repos/${org}/${name}/collaborators`).catch(() => []),
-          ghJson<any[]>(`repos/${org}/${name}/contents/.github/workflows?ref=${encodeURIComponent(ref)}`).catch(() => null),
+          ghPaged<any>(`repos/${full(name)}/actions/secrets`, 100, 5, 'secrets').catch(() => []),
+          ghPaged<any>(`repos/${full(name)}/actions/variables`, 30, 5, 'variables').catch(() => []),
+          ghPaged<any>(`repos/${full(name)}/collaborators`).catch(() => []),
+          ghJson<any[]>(`repos/${full(name)}/contents/.github/workflows?ref=${encodeURIComponent(ref)}`).catch(() => null),
         ]);
         const paths = dirs.flatMap((d) => (Array.isArray(d) ? d : [])).filter((f) => f.type === 'file' && /\.ya?ml$/.test(f.name)).map((f) => f.path as string);
-        const files: WorkflowFile[] = (await Promise.all(paths.map(async (p) => ({ path: p, text: (await raw(org, name, p, ref)) ?? '' })))).filter((f) => f.text);
+        const files: WorkflowFile[] = (await Promise.all(paths.map(async (p) => ({ path: p, text: (await raw(...(full(name).split('/') as [string, string]), p, ref)) ?? '' })))).filter((f) => f.text);
         view.workflows = files.map((f) => f.path.replace(/^\.github\/workflows\//, ''));
         const usage = await repoUsage(files, template);
         view.templateFiles = usage.templateFiles;
@@ -175,8 +174,8 @@ export class SecretsService {
   private target(scope: string, repo?: string) {
     if (scope === 'org') throw new BadRequestException('사용자 계정엔 조직 시크릿, 변수가 없습니다');
     if (scope !== 'repo' || !repo || !REPO_RE.test(repo)) throw new BadRequestException('저장소를 고르세요');
-    if (this.orgRepos.size && !this.orgRepos.has(repo)) throw new NotFoundException(`${cfg.owner} 의 저장소가 아닙니다`);
-    return { base: `repos/${cfg.owner}/${repo}`, label: repo };
+    if (this.orgRepos.size && !this.orgRepos.has(repo)) throw new NotFoundException('콘솔이 다루는 저장소가 아닙니다');
+    return { base: `repos/${full(repo)}`, label: repo };
   }
 
   private async send(path: string, method: string, body?: unknown) {

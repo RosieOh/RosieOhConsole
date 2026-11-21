@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { audit } from '../audit.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg } from '../config.js';
+import { cfg, full } from '../config.js';
 import { DeployService } from '../deploy/deploy.service.js';
 import { ghFetch, ghJson } from '../github.js';
 import { JsonStore, RevConflict, Versioned } from '../json-store.js';
@@ -73,19 +73,19 @@ export class PromoteService implements OnModuleInit, OnModuleDestroy {
     if (plan.source === 'testbed') {
       const tb = await this.deploy.trackNow(key, 'testbed');
       version = tb?.current?.version ?? null; testbedAt = tb?.current?.at ?? null;
-      if (version) sha = (await ghJson<any>(`repos/${cfg.owner}/${c.repo}/git/commits/${version}`))?.sha ?? null;
+      if (version) sha = (await ghJson<any>(`repos/${full(c.repo)}/git/commits/${version}`))?.sha ?? null;
     } else {
-      const dev = await ghJson<any>(`repos/${cfg.owner}/${c.repo}/branches/dev`);
+      const dev = await ghJson<any>(`repos/${full(c.repo)}/branches/dev`);
       sha = dev?.commit?.sha ?? null; version = sha ? sha.slice(0, 12) : null;
     }
     const prod = plan.lane === 'prod' ? await this.deploy.trackNow(key, 'prod') : null;
-    const main = await ghJson<any>(`repos/${cfg.owner}/${c.repo}/branches/main`);
+    const main = await ghJson<any>(`repos/${full(c.repo)}/branches/main`);
     let ahead: { sha: string; message: string; author: string }[] = [];
     let mainOnly = 0;
     if (sha && main?.commit?.sha) {
-      const cmp = await ghJson<any>(`repos/${cfg.owner}/${c.repo}/compare/${main.commit.sha}...${sha}`).catch(() => null);
+      const cmp = await ghJson<any>(`repos/${full(c.repo)}/compare/${main.commit.sha}...${sha}`).catch(() => null);
       ahead = (cmp?.commits || []).filter((x: any) => (x.parents?.length ?? 1) < 2).map((x: any) => ({ sha: x.sha.slice(0, 12), message: String(x.commit?.message || '').split('\n')[0], author: x.commit?.author?.name || '' }));
-      const back = await ghJson<any>(`repos/${cfg.owner}/${c.repo}/compare/${sha}...${main.commit.sha}`).catch(() => null);
+      const back = await ghJson<any>(`repos/${full(c.repo)}/compare/${sha}...${main.commit.sha}`).catch(() => null);
       mainOnly = (back?.commits || []).filter((x: any) => (x.parents?.length ?? 1) < 2).length;
     }
     const tbHealth = plan.source === 'testbed' ? this.status.streak(key, 'testbed') : null;
@@ -162,23 +162,23 @@ export class PromoteService implements OnModuleInit, OnModuleDestroy {
       let mergedAt = Date.now();
       if (st.aheadCount > 0) {
         const branch = `release/console-${s.comp}-${s.version}`;
-        const mk = await this.write(`repos/${cfg.owner}/${s.repo}/git/refs`, 'POST', { ref: `refs/heads/${branch}`, sha: s.sha });
+        const mk = await this.write(`repos/${full(s.repo)}/git/refs`, 'POST', { ref: `refs/heads/${branch}`, sha: s.sha });
         if (!mk.ok && mk.status !== 422) return await fail(`릴리스 브랜치를 만들지 못했습니다(HTTP ${mk.status})`);
         const refs = issueRefs(st.ahead.map((x) => x.message));
         const body = [`콘솔 예약 승격, ${s.by} 가 ${new Date(s.createdAt).toLocaleString('ko-KR')} 에 잡은 예약(${s.id}).`, '',
           `${s.plan.source === 'testbed' ? '테스트배드에서 지켜본' : 'dev 끝'} 버전 ${s.version} 을 main 으로.`, '',
           ...st.ahead.slice(0, 40).map((x) => `- ${x.sha} ${x.message}`), '', refs.length ? `관련: ${refs.map((n) => '#' + n).join(' ')}` : ''].join('\n');
-        const pr = await this.write(`repos/${cfg.owner}/${s.repo}/pulls`, 'POST', { title: `릴리스: ${s.version} (콘솔 예약 ${refs.slice(0, 5).map((n) => '#' + n).join(' ')})`.trim(), head: branch, base: 'main', body });
+        const pr = await this.write(`repos/${full(s.repo)}/pulls`, 'POST', { title: `릴리스: ${s.version} (콘솔 예약 ${refs.slice(0, 5).map((n) => '#' + n).join(' ')})`.trim(), head: branch, base: 'main', body });
         if (!pr.ok) return await fail(`릴리스 PR 을 만들지 못했습니다(HTTP ${pr.status}), 같은 PR 이 이미 열려 있는지 확인하세요`);
         const prj: any = await pr.json();
         this.note(id, `릴리스 PR #${prj.number}, 검사 기다림`, undefined, { pr: { number: prj.number, url: prj.html_url } });
         const until = Date.now() + WAIT_CHECK_MS;
         let merged = false; let last = '';
         while (Date.now() < until) {
-          const head = (await ghJson<any>(`repos/${cfg.owner}/${s.repo}/pulls/${prj.number}`))?.head?.sha;
-          const stj = head ? await ghJson<any>(`repos/${cfg.owner}/${s.repo}/commits/${head}/status`) : null;
+          const head = (await ghJson<any>(`repos/${full(s.repo)}/pulls/${prj.number}`))?.head?.sha;
+          const stj = head ? await ghJson<any>(`repos/${full(s.repo)}/commits/${head}/status`) : null;
           if (stj?.state === 'failure' || stj?.state === 'error') return await fail(`커밋 검사 실패, 릴리스 PR #${prj.number} 를 확인하세요`);
-          const m = await this.write(`repos/${cfg.owner}/${s.repo}/pulls/${prj.number}/merge`, 'POST', { merge_method: 'merge' });
+          const m = await this.write(`repos/${full(s.repo)}/pulls/${prj.number}/merge`, 'POST', { merge_method: 'merge' });
           if (m.ok) { merged = true; break; }
           last = `HTTP ${m.status}`;
           await sleep(15_000);
@@ -186,13 +186,13 @@ export class PromoteService implements OnModuleInit, OnModuleDestroy {
         if (!merged) return await fail(`머지하지 못했습니다(${last}), 릴리스 PR #${prj.number} 를 확인하세요`);
         mergedAt = Date.now();
       }
-      const mainSha = (await ghJson<any>(`repos/${cfg.owner}/${s.repo}/branches/main`))?.commit?.sha?.slice(0, 12);
+      const mainSha = (await ghJson<any>(`repos/${full(s.repo)}/branches/main`))?.commit?.sha?.slice(0, 12);
       this.note(id, st.aheadCount > 0 ? `릴리스 PR 머지, main ${mainSha}` : `main ${mainSha}`, true, { phase: 'merged', mergedAt, mainSha });
 
       // 3) kamal-prod 면 deploy 실행
       if (s.plan.method === 'merge-dispatch' && s.plan.dispatch) {
         const d = s.plan.dispatch;
-        const r = await this.write(`repos/${cfg.owner}/${s.repo}/actions/workflows/${encodeURIComponent(d.workflow)}/dispatches`, 'POST', { ref: d.ref, inputs: d.inputs });
+        const r = await this.write(`repos/${full(s.repo)}/actions/workflows/${encodeURIComponent(d.workflow)}/dispatches`, 'POST', { ref: d.ref, inputs: d.inputs });
         if (!(r.status === 204 || r.ok)) return await fail(`운영 배포 실행을 GitHub 이 받지 않았습니다(HTTP ${r.status})`);
         this.note(id, `운영 배포 실행 요청, ${d.workflow} deploy`, true, { phase: 'dispatched' });
       }
@@ -213,7 +213,7 @@ export class PromoteService implements OnModuleInit, OnModuleDestroy {
       const until = Date.now() + WAIT_RUN_MS;
       let run: any = null;
       while (Date.now() < until) {
-        const runs: any[] = (await ghJson<any>(`repos/${cfg.owner}/${s.repo}/actions/workflows/${encodeURIComponent(s.plan.watch)}/runs?per_page=5`))?.workflow_runs || [];
+        const runs: any[] = (await ghJson<any>(`repos/${full(s.repo)}/actions/workflows/${encodeURIComponent(s.plan.watch)}/runs?per_page=5`))?.workflow_runs || [];
         run = runs.find((r) => Date.parse(r.run_started_at || r.created_at || 0) >= mergedAt - 60_000) ?? null;
         if (run && !this.store.get().items[id].run) this.note(id, `실행 #${run.run_number} 시작`, undefined, { run: { id: run.id, url: run.html_url } });
         if (run?.status === 'completed') break;

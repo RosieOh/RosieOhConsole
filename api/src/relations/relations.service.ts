@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, OnModuleDestroy, On
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { audit } from '../audit.js';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg } from '../config.js';
+import { cfg, full } from '../config.js';
 import { ghJson, ghRaw } from '../github.js';
 import { DEFAULT_INFRA, InfraKind, SCAN_PATHS } from '../infra/defaults.js';
 import { infraName } from '../infra/names.js';
@@ -82,7 +82,7 @@ export class RelationsService implements OnModuleInit, OnModuleDestroy {
 
   /** 저장소 파일 목록(GitHub 은 쪽 나눔 없이 한 번에, 아주 크면 truncated 로 잘린다) */
   private async tree(repo: string, ref: string): Promise<{ path: string; size: number }[]> {
-    const t = await ghJson<any>(`repos/${cfg.owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`);
+    const t = await ghJson<any>(`repos/${full(repo)}/git/trees/${encodeURIComponent(ref)}?recursive=1`);
     if (t?.truncated) console.warn(`[연관] ${repo} 파일이 많아 목록이 잘렸다`);
     return (t?.tree || []).filter((e: any) => e.type === 'blob').map((e: any) => ({ path: e.path, size: e.size ?? 0 }));
   }
@@ -93,7 +93,7 @@ export class RelationsService implements OnModuleInit, OnModuleDestroy {
     const prev = this.scan.comps[key];
     const at = new Date().toISOString();
     try {
-      const info = await ghJson<any>(`repos/${cfg.owner}/${c.repo}`);
+      const info = await ghJson<any>(`repos/${full(c.repo)}`);
       if (!info) throw new Error('저장소를 찾지 못했다');
       const ref = info.default_branch || 'main';
       const rule = SCAN_PATHS[key] || {};

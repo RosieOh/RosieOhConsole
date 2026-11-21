@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg } from '../config.js';
+import { cfg, full } from '../config.js';
 import { ghFetch, ghJson } from '../github.js';
 import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
@@ -79,13 +79,13 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async pollRepo(repo: string) {
-    const j = await ghJson<any>(`repos/${cfg.owner}/${repo}/actions/runs?per_page=10`);
+    const j = await ghJson<any>(`repos/${full(repo)}/actions/runs?per_page=10`);
     const runs: any[] = j?.workflow_runs || [];
     this.repoState.set(repo, { at: Date.now(), runs });
     for (const r of runs) await this.absorb(repo, r);
     // 진행 중으로 기억한 실행이 최근 10개 밖으로 밀리면(옛 실행 재실행, 15분마다 도는 probe) 끝을 못 본다. id 로 직접 묻는다 (#171)
     for (const id of lostRunIds(this.active.values(), repo, new Set<number>(runs.map((r) => r.id)))) {
-      const r = await ghJson<any>(`repos/${cfg.owner}/${repo}/actions/runs/${id}`).catch(() => undefined);
+      const r = await ghJson<any>(`repos/${full(repo)}/actions/runs/${id}`).catch(() => undefined);
       if (r === null) this.active.delete(`${repo}#${id}`);   // GitHub 에서 지워진 실행
       else if (r) await this.absorb(repo, r);
     }
@@ -101,7 +101,7 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
     const ended = r.completed_at || null;
     if (!running && (!ended || Date.now() - Date.parse(ended) > RECENT_MS) && !this.active.has(k)) return;
     if (!running && this.active.get(k)?.state !== 'running' && this.active.has(k)) return;   // 끝난 것은 한 번만 다시 읽는다
-    const jobs: any[] = (await ghJson<any>(`repos/${cfg.owner}/${repo}/actions/runs/${r.id}/jobs`))?.jobs || [];
+    const jobs: any[] = (await ghJson<any>(`repos/${full(repo)}/actions/runs/${r.id}/jobs`))?.jobs || [];
     const steps: Step[] = jobs.flatMap((x) => x.steps || []);
     const lane = tracks[0].lane;
     let comps = [...new Set(tracks.map((t) => t.comp))];
@@ -124,7 +124,7 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
     for (const c of DEFAULT_COMPONENTS) if (comps.includes(c.key)) for (const t of [c.deploy?.testbed, c.deploy?.prod]) if (t) byKamal.set(t.kamal, c.key);
     for (const job of jobs) {
       if (!job.runner_name && job.status === 'waiting') continue;
-      const res = await ghFetch(`repos/${cfg.owner}/${repo}/actions/jobs/${job.id}/logs`).catch(() => null);
+      const res = await ghFetch(`repos/${full(repo)}/actions/jobs/${job.id}/logs`).catch(() => null);
       if (!res?.ok) continue;
       const log = await res.text();
       const found = [...byKamal.entries()].filter(([k]) => new RegExp(`${k}-web-`).test(log)).map(([, c]) => c);
@@ -146,13 +146,13 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
     const k = `${repo}#${runId}`;
     const hit = this.tails.get(k);
     if (hit && Date.now() - hit.at < 2500) return hit.data;
-    const jobs: any[] = (await ghJson<any>(`repos/${cfg.owner}/${repo}/actions/runs/${runId}/jobs`))?.jobs || [];
+    const jobs: any[] = (await ghJson<any>(`repos/${full(repo)}/actions/runs/${runId}/jobs`))?.jobs || [];
     // 재사용 워크플로를 부르는 쪽 작업은 러너가 없고 로그도 없다 — 러너에서 실제로 도는 작업을 고른다
     const real = jobs.filter((j) => j.runner_name);
     const job = real.find((j) => j.status === 'in_progress' || j.status === 'running') ?? real[real.length - 1] ?? jobs[jobs.length - 1];
     let lines: string[] = [];
     if (job) {
-      const res = await ghFetch(`repos/${cfg.owner}/${repo}/actions/jobs/${job.id}/logs`).catch(() => null);
+      const res = await ghFetch(`repos/${full(repo)}/actions/jobs/${job.id}/logs`).catch(() => null);
       if (res?.ok) lines = tailLog(await res.text(), 12);
     }
     const step = (job?.steps || []).find((s: any) => s.status === 'in_progress' || s.status === 'running');
@@ -164,11 +164,11 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
   /** 실패(또는 지정) 단계 로그 — 단계 시각으로 잘라서 */
   async stepLog(repo: string, runId: number, stepName?: string) {
     if (!this.repos().includes(repo)) throw new NotFoundException();
-    const jobs: any[] = (await ghJson<any>(`repos/${cfg.owner}/${repo}/actions/runs/${runId}/jobs`))?.jobs || [];
+    const jobs: any[] = (await ghJson<any>(`repos/${full(repo)}/actions/runs/${runId}/jobs`))?.jobs || [];
     for (const job of jobs) {
       const step = (job.steps || []).find((s: any) => (stepName ? s.name === stepName : s.conclusion === 'failure'));
       if (!step) continue;
-      const res = await ghFetch(`repos/${cfg.owner}/${repo}/actions/jobs/${job.id}/logs`);
+      const res = await ghFetch(`repos/${full(repo)}/actions/jobs/${job.id}/logs`);
       if (!res.ok) continue;
       return { job: job.name, step: step.name, log: sliceLog(await res.text(), step.started_at, step.completed_at) };
     }

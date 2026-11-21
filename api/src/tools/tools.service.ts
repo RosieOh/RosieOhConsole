@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { cfg } from '../config.js';
+import { cfg, full } from '../config.js';
 import { ghJson, ghRaw, ownerRepos } from '../github.js';
 import { ToolMeta, catalog } from './catalog.js';
 
@@ -36,7 +36,7 @@ export class ToolsService {
 
   private async one(r: any, meta: ToolMeta | null): Promise<ToolRepo> {
     const branch = r.default_branch;
-    const commits: any[] = (await ghJson<any[]>(`repos/${cfg.owner}/${r.name}/commits?sha=${encodeURIComponent(branch)}&per_page=8`)) || [];
+    const commits: any[] = (await ghJson<any[]>(`repos/${full(r.name)}/commits?sha=${encodeURIComponent(branch)}&per_page=8`)) || [];
     const changes = commits.map((c) => ({
       sha: c.sha.slice(0, 7), date: c.commit?.committer?.date ?? '', message: String(c.commit?.message || '').split('\n')[0],
       author: c.author?.login || c.commit?.author?.name || '', url: c.html_url,
@@ -47,7 +47,7 @@ export class ToolsService {
         const m = JSON.parse((await this.file(r.name, '.claude-plugin/marketplace.json', branch)) || '{}');
         version = (m.plugins || []).map((p: any) => `${p.name} ${p.version}`).join(', ') || null;
       } else {
-        const tags: any[] = (await ghJson<any[]>(`repos/${cfg.owner}/${r.name}/tags?per_page=1`)) || [];
+        const tags: any[] = (await ghJson<any[]>(`repos/${full(r.name)}/tags?per_page=1`)) || [];
         version = tags[0]?.name ?? null;
       }
     } catch (e: any) { console.warn(`[도구] ${r.name} 버전 읽기 실패:`, e?.message); }

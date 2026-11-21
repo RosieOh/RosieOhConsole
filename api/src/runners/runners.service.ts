@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg } from '../config.js';
+import { cfg, full } from '../config.js';
 import { ghFetch, ghJson, ownerRepos } from '../github.js';
 import { normName, placeOf, retired, RunnerPlace } from './known.js';
 import { History, JobLite, queueOf, record, RunnerStats, statsFor, toJob, uptime } from './stats.js';
@@ -98,7 +98,7 @@ export class RunnersService implements OnModuleInit, OnModuleDestroy {
   // 셀프 호스티드 러너 — GitHub 사용자 계정엔 계정 단위 러너가 없어 저장소마다 읽는다(토큰에 Administration read 가 있어야 보인다)
   private async runnerList(): Promise<{ source: 'repo'; list: any[] }> {
     const repos = await this.liveRepos();
-    const lists = await pool(repos, 6, (r: any) => ghJson<any>(`repos/${cfg.owner}/${r.name}/actions/runners?per_page=100`).catch(() => null));
+    const lists = await pool(repos, 6, (r: any) => ghJson<any>(`repos/${full(r.name)}/actions/runners?per_page=100`).catch(() => null));
     const byId = new Map<number, any>();
     for (const j of lists) for (const r of j?.runners || []) byId.set(r.id, r);
     return { source: 'repo', list: [...byId.values()] };
@@ -128,10 +128,11 @@ export class RunnersService implements OnModuleInit, OnModuleDestroy {
     const per = await pool(repos, 6, async (r: any) => {
       const out: Omit<Usage, 'components'>[] = [];
       const ref = r.default_branch || 'main';
-      const dir = await ghJson<any[]>(`repos/${cfg.owner}/${r.name}/contents/.github/workflows?ref=${encodeURIComponent(ref)}`).catch(() => null);
+      const dir = await ghJson<any[]>(`repos/${full(r.name)}/contents/.github/workflows?ref=${encodeURIComponent(ref)}`).catch(() => null);
       for (const f of Array.isArray(dir) ? dir : []) {
         if (f.type !== 'file' || !/\.ya?ml$/.test(f.name)) continue;
-        const text = await this.raw(cfg.owner, r.name, f.path, ref).catch(() => null);
+        const [o, n] = full(r.name).split('/');
+        const text = await this.raw(o, n, f.path, ref).catch(() => null);
         if (!text) continue;
         const wf = parseWorkflow(text);
         for (const j of wf.jobs) {
@@ -160,8 +161,8 @@ export class RunnersService implements OnModuleInit, OnModuleDestroy {
   // ── 작업 — 최근 push 한 저장소들의 최근 실행 → 그 작업들(GitHub 엔 계정 전체 작업 목록이 없다) ──
   private async recentJobs(): Promise<JobLite[]> {
     const repos = (await this.liveRepos()).slice(0, JOB_REPOS);
-    const runs = (await pool(repos, 6, async (r: any) => ((await ghJson<any>(`repos/${cfg.owner}/${r.name}/actions/runs?per_page=${RUNS_PER_REPO}`).catch(() => null))?.workflow_runs || []).map((x: any) => ({ repo: r.name, id: x.id })))).flat();
-    const lists = await pool(runs, 6, (x: { repo: string; id: number }) => ghJson<any>(`repos/${cfg.owner}/${x.repo}/actions/runs/${x.id}/jobs?per_page=50`).catch(() => null));
+    const runs = (await pool(repos, 6, async (r: any) => ((await ghJson<any>(`repos/${full(r.name)}/actions/runs?per_page=${RUNS_PER_REPO}`).catch(() => null))?.workflow_runs || []).map((x: any) => ({ repo: r.name, id: x.id })))).flat();
+    const lists = await pool(runs, 6, (x: { repo: string; id: number }) => ghJson<any>(`repos/${full(x.repo)}/actions/runs/${x.id}/jobs?per_page=50`).catch(() => null));
     const m = new Map<number, JobLite>();
     for (const l of lists) for (const j of l?.jobs || []) m.set(j.id, toJob(j));
     return [...m.values()];

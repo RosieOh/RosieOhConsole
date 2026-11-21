@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg, repoUrl as urlOf } from '../config.js';
+import { cfg, repoUrl as urlOf, full } from '../config.js';
 import { ghJson } from '../github.js';
 import { StoreLane, latestStoreTag, readStoreLane } from './store-lane.js';
 
@@ -64,8 +64,8 @@ export class StoreAppsService {
     const base: StoreAppView = { key, repo, repoUrl, workflow, storeVersion: null, storeTagUrl: null, storeAt: null, lastStore: null, lastOta: null, last: null, running: [], history: [] };
     try {
       const [runsJ, tags] = await Promise.all([
-        ghJson<any>(`repos/${cfg.owner}/${repo}/actions/workflows/${encodeURIComponent(workflow)}/runs?per_page=${RUNS}`),
-        ghJson<any[]>(`repos/${cfg.owner}/${repo}/tags?per_page=50`),
+        ghJson<any>(`repos/${full(repo)}/actions/workflows/${encodeURIComponent(workflow)}/runs?per_page=${RUNS}`),
+        ghJson<any[]>(`repos/${full(repo)}/tags?per_page=50`),
       ]);
       const v = latestStoreTag((tags || []).map((t) => t.name), prefix);
       const tag = v ? (tags || []).find((t) => t.name === prefix + v) : null;
@@ -81,7 +81,7 @@ export class StoreAppsService {
           const k = `${repo}#${r.id}`;
           let hit = this.lanes.get(k);
           if (!hit) {
-            const jobs: any[] = (await ghJson<any>(`repos/${cfg.owner}/${repo}/actions/runs/${r.id}/jobs`))?.jobs || [];
+            const jobs: any[] = (await ghJson<any>(`repos/${full(repo)}/actions/runs/${r.id}/jobs`))?.jobs || [];
             const steps = jobs.flatMap((j) => j.steps || []);
             hit = { lane: readStoreLane(steps, state), runner: jobs.find((j) => j.runner_name)?.runner_name ?? null };
             this.lanes.set(k, hit); this.save();

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { apkApps, isApkKind } from '../apks/apps.js';
 import { audit } from '../audit.js';
-import { cfg } from '../config.js';
+import { cfg, full, REPO_RE } from '../config.js';
 import { ghJson, ghRaw, ownerRepos } from '../github.js';
 import { JsonStore, RevConflict } from '../json-store.js';
 import { DEFAULT_COMPONENTS, DEFAULT_NODES } from './defaults.js';
@@ -21,7 +21,6 @@ export type CatalogOp =
   | { op: 'reset'; node?: string; key?: string };
 
 const NAME_MAX = 60;
-const REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const CAND_TTL = 10 * 60 * 1000;
 
 @Injectable()
@@ -191,10 +190,10 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
     if (!REPO_RE.test(repo)) throw new BadRequestException('저장소 이름이 올바르지 않습니다');
     const hit = this.cands.get(repo);
     if (!force && hit && Date.now() - hit.at < CAND_TTL) return hit.list;
-    const info = await ghJson<any>(`repos/${cfg.owner}/${repo}`);
+    const info = await ghJson<any>(`repos/${full(repo)}`);
     if (!info) throw new BadRequestException('저장소를 찾지 못했습니다');
     const ref = info.default_branch || 'main';
-    const tree = await ghJson<any>(`repos/${cfg.owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`);
+    const tree = await ghJson<any>(`repos/${full(repo)}/git/trees/${encodeURIComponent(ref)}?recursive=1`);
     const paths = (tree?.tree || []).filter((e: any) => e.type === 'blob' && (e.size ?? 0) <= LOGO_MAX).map((e: any) => e.path as string);
     const list: { file: string; path: string }[] = [];
     for (const p of pickCandidates(paths)) {
