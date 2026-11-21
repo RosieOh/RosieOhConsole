@@ -3968,3 +3968,49 @@ input:focus, select:focus, textarea:focus {
 .switch[aria-checked="true"]::after { transform: translateX(20px); }
 .switch:disabled { opacity: .5; cursor: not-allowed; }
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ══ 회원 — 로그인·회원가입·마이페이지·회원 관리 ══ */
+.auth-form { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.auth-form label.fld { margin-bottom: 10px; }
+.auth-form input { width: 100%; }
+.login-glass .auth-form .err { margin: 2px 0 8px; }
+.auth-form small.err { display: block; margin: 4px 0 0; font-size: 11.5px; }
+.auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .auth-row { grid-template-columns: 1fr; } }
+button.login-cta { cursor: pointer; font-family: inherit; }
+button.login-cta:disabled { opacity: 0.6; cursor: default; filter: none; }
+.auth-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: 11.5px; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--border-2); }
+/* GitHub 버튼 — 주 버튼보다 한 단 낮게(테두리만 있는 유리) */
+.login-cta.auth-gh {
+  gap: 8px; color: var(--frame-ink, var(--text)); text-shadow: none;
+  background: color-mix(in srgb, var(--panel) 55%, transparent) !important;
+  border: 1px solid var(--border-2); box-shadow: none; aspect-ratio: auto; height: 46px;
+}
+.login-cta.auth-gh::after { display: none; }
+.auth-links { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; font-size: 12.5px; }
+.auth-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.auth-links .login-alt { margin: 0; font-weight: 500; }
+.auth-hint { color: var(--muted); font-size: 11.5px; margin-top: 10px; }
+.auth-note { color: var(--green); font-size: 12.5px; font-weight: 600; }
+
+.mypage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; align-items: start; }
+.mypage-who { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+.mypage-who img, .mypage-initial { width: 56px; height: 56px; border-radius: 50%; flex: none; }
+.mypage-initial { display: grid; place-items: center; font-size: 22px; font-weight: 700; color: var(--accent-ink); background: var(--accent); }
+.mypage-name { font-size: 16px; font-weight: 700; }
+.mypage-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.mypage-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 12px; font-size: 12.5px; }
+.mypage-kv dt { color: var(--muted); }
+.mypage-kv dd { margin: 0; }
+.mypage-form { display: flex; flex-direction: column; gap: 2px; max-width: 360px; margin-top: 8px; }
+.mypage-form .fld input { width: 100%; }
+.mypage-form small.err { display: block; margin-top: 4px; }
+.mypage-method { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.mypage-method b { display: inline-flex; align-items: center; gap: 6px; }
+.mypage-method .muted { font-size: 12px; margin-top: 2px; }
+.mypage-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.mypage-table th, .mypage-table td { text-align: left; padding: 7px 12px; border-top: 1px solid var(--border); white-space: nowrap; }
+.mypage-table th { color: var(--muted); font-weight: 600; border-top: none; }
+.members-pending { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid var(--border); }
+.members-pending:first-child { border-top: none; }

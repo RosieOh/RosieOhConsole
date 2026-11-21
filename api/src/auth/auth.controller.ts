@@ -1,39 +1,93 @@
-import { Controller, Get, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpException, Post, Query, Req, Res } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { secureCookie } from '../config.js';
-import { isAllowed } from '../access/access.js';
+import { cfg, secureCookie } from '../config.js';
+import { audit } from '../audit.js';
+import { AccountError, githubLogin, linkGithub, passwordLogin, signup } from '../accounts/accounts.js';
 import { authorizeUrl, exchangeCode, whoAmI } from './github-oauth.js';
 import { SESSION_COOKIE, STATE_COOKIE, TTL_MS, sessionOf, signSession } from './session.js';
 
 const cookieOpts = () => ({ httpOnly: true, secure: secureCookie(), sameSite: 'lax' as const, path: '/' });
+const sameOrigin = (req: Request) => {
+  const origin = req.get('origin');
+  if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+};
+/** 계정 오류 → HTTP 오류(화면이 code 로 갈래를 탄다) */
+export const httpOf = (e: unknown) => (e instanceof AccountError ? new HttpException({ message: e.message, code: e.code }, e.status) : e);
+
+export function giveSession(res: Response, login: string, sv: number) {
+  res.cookie(SESSION_COOKIE, signSession(login, sv), { ...cookieOpts(), maxAge: TTL_MS });
+}
 
 @Controller('dashapi')
 export class AuthController {
-  // 로그인 버튼 → GitHub 로그인 화면
+  // GitHub 로그인 화면으로. mode=link 면 로그인한 사람의 계정에 GitHub 을 연결한다(마이페이지)
   @Get('login')
-  login(@Res() res: Response) {
-    const state = randomBytes(16).toString('hex');
+  login(@Query('mode') mode: string, @Req() req: Request, @Res() res: Response) {
+    const link = mode === 'link';
+    if (link && !sessionOf(req)) return res.redirect('/?login=expired');
+    const state = randomBytes(16).toString('hex') + (link ? '.link' : '');
     res.cookie(STATE_COOKIE, state, { ...cookieOpts(), maxAge: 10 * 60 * 1000 });
     res.redirect(authorizeUrl(state));
   }
 
-  // GitHub 이 돌려보낸 곳 — 신원 확인 → 허용 명단 확인 → 세션 쿠키
+  // GitHub 이 돌려보낸 곳 — 신원 확인 → (연결 | 로그인·가입 요청) → 세션 쿠키
   @Get('oauth/callback')
   async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: Request, @Res() res: Response) {
     const want = String(req.cookies?.[STATE_COOKIE] || '');
     res.clearCookie(STATE_COOKIE, cookieOpts());
     const ok = want && state && want.length === state.length && timingSafeEqual(Buffer.from(want), Buffer.from(state));
     if (!ok || !code) return res.redirect('/?login=expired');
+    let gh: string;
+    try { gh = await whoAmI(await exchangeCode(code)); }
+    catch (e: any) { console.warn('[로그인] GitHub 확인 실패:', e?.message); return res.redirect('/?login=failed'); }
+
+    if (state.endsWith('.link')) {
+      const s = sessionOf(req);
+      if (!s) return res.redirect('/?login=expired');
+      try {
+        linkGithub(s.login, gh);
+        await audit({ login: s.login, action: 'account.github.link', target: gh, ok: true });
+        return res.redirect('/#account?github=linked');
+      } catch (e: any) {
+        return res.redirect('/#account?github=' + encodeURIComponent(e instanceof AccountError ? e.code : 'failed'));
+      }
+    }
+
     try {
-      const login = await whoAmI(await exchangeCode(code));
-      if (!isAllowed(login)) return res.redirect('/?login=forbidden');
-      res.cookie(SESSION_COOKIE, signSession(login), { ...cookieOpts(), maxAge: TTL_MS });
+      const a = githubLogin(gh, req.ip || '?');
+      giveSession(res, a.login, a.sv);
       return res.redirect('/');
     } catch (e: any) {
+      if (e instanceof AccountError) {
+        if (e.code === 'pending') await audit({ login: gh, action: 'account.signup.github', target: gh, detail: '승인 대기', ok: true });
+        return res.redirect('/?login=' + encodeURIComponent(e.code));
+      }
       console.warn('[로그인] 실패:', e?.message);
       return res.redirect('/?login=failed');
     }
+  }
+
+  // 아이디·비밀번호 로그인
+  @Post('auth/login')
+  passwordLogin(@Body() b: { login?: string; password?: string }, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    sameOrigin(req);
+    try {
+      const a = passwordLogin(String(b?.login ?? ''), String(b?.password ?? ''), req.ip || '?');
+      giveSession(res, a.login, a.sv);
+      return { ok: true, login: a.login };
+    } catch (e) { throw httpOf(e); }
+  }
+
+  // 회원가입 — 승인 대기로 남는다(세션은 주지 않는다)
+  @Post('auth/signup')
+  async signup(@Body() b: { login?: string; name?: string; email?: string; password?: string }, @Req() req: Request) {
+    sameOrigin(req);
+    try {
+      const a = signup(b || {});
+      await audit({ login: a.login, action: 'account.signup', target: a.login, detail: `승인 대기, ${req.ip}`, ok: true });
+      return { ok: true, login: a.login, status: a.status };
+    } catch (e) { throw httpOf(e); }
   }
 
   @Post('logout')
@@ -46,6 +100,6 @@ export class AuthController {
   @Get('me')
   me(@Req() req: Request) {
     const s = sessionOf(req);
-    return s ? { authenticated: true, login: s.login, role: s.role, admin: s.admin, deployer: s.deployer } : { authenticated: false };
+    return s ? { authenticated: true, login: s.login, name: s.name, role: s.role, admin: s.admin, deployer: s.deployer } : { authenticated: false };
   }
 }

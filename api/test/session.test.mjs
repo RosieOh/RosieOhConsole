@@ -12,8 +12,8 @@ const { setRole } = await import('../dist/access/access.js');
 setRole('boss', 'dev1', 'viewer');   // 로그인은 권한 명단에 있는 사람만
 
 test('서명한 세션을 다시 읽는다 — 관리자 여부 포함', () => {
-  assert.deepEqual(readSession(signSession('boss')), { login: 'boss', role: 'admin', admin: true, deployer: true });
-  assert.deepEqual(readSession(signSession('dev1')), { login: 'dev1', role: 'viewer', admin: false, deployer: false });
+  assert.deepEqual(readSession(signSession('boss')), { login: 'boss', name: 'boss', role: 'admin', admin: true, deployer: true });
+  assert.deepEqual(readSession(signSession('dev1')), { login: 'dev1', name: 'dev1', role: 'viewer', admin: false, deployer: false });
 });
 
 test('권한 명단에 없거나 빠지면 서명이 맞아도 익명', () => {
@@ -31,7 +31,7 @@ test('위조·만료·빈 값은 익명', () => {
   const forged = Buffer.from(JSON.stringify({ login: 'boss', exp: Date.now() + 1e6 })).toString('base64url');
   assert.equal(readSession(`${forged}.${sig}`), null);
   assert.equal(readSession(`${body}.AAAA`), null);
-  assert.equal(readSession(signSession('dev1', Date.now() - TTL_MS - 1)), null);
+  assert.equal(readSession(signSession('dev1', 0, Date.now() - TTL_MS - 1)), null);
   assert.equal(readSession(undefined), null);
   assert.equal(readSession('garbage'), null);
 });

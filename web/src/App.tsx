@@ -4,7 +4,8 @@ import { api, Me } from './api';
 import { CatalogProvider } from './catalog';
 import { Avatar, UsersProvider } from './users';
 import { LiquidBg } from './components/LiquidBg';
-import { Login } from './components/Login';
+import { AuthPages } from './components/Login';
+import { MyPage } from './components/MyPage';
 import { Overview } from './components/Overview';
 import { Tools } from './components/Tools';
 import { Docs } from './components/Docs';
@@ -21,12 +22,12 @@ import { FlowPage } from './flow/FlowPage';
 import { BoardPage, prefetchBoard } from './board/BoardPage';
 import './board/board.css';
 import './grid';
-import { BookOpen, ChevronDown, Code2, Cpu, FileText, FlaskConical, KanbanSquare, KeyRound, LayoutDashboard, LogOut, Moon, Network, Package, Rocket, Server, Settings as SettingsIcon, Sun, ToggleRight, Workflow, Wrench, Boxes } from 'lucide-react';
+import { BookOpen, ChevronDown, Code2, Cpu, FileText, FlaskConical, KanbanSquare, KeyRound, LayoutDashboard, LogOut, Moon, Network, Package, Rocket, Server, Settings as SettingsIcon, Sun, ToggleRight, Workflow, Wrench, Boxes, UserRound } from 'lucide-react';
 import { applyTheme, currentTheme } from './theme';
 
 // 틀(#131) — 검은 프레임 위쪽에 묶음 알약 메뉴, 고른 알약 아래로 맥북 노치처럼 검은 탭이 캔버스로 파고든다(스프링으로 따라감).
 // 캔버스 왼쪽 레일은 그 묶음의 화면들, 아래 도크는 자주 가는 곳. 화면이 바뀔 때 살짝 떠오르며 바뀐다.
-type Page = 'overview' | 'deploy' | 'flow' | 'flags' | 'servers' | 'runners' | 'apks' | 'secrets' | 'mxtools' | 'architecture' | 'tools' | 'docs' | 'settings' | 'board' | 'report';
+type Page = 'account' | 'overview' | 'deploy' | 'flow' | 'flags' | 'servers' | 'runners' | 'apks' | 'secrets' | 'mxtools' | 'architecture' | 'tools' | 'docs' | 'settings' | 'board' | 'report';
 type Icon = React.ComponentType<{ size?: number; strokeWidth?: number }>;
 type NavDef = { id: Page; label: string; icon: Icon; admin?: boolean };
 /** 콘솔 밖으로 나가는 자리. 페이지가 아니라 새 탭으로 연다. */
@@ -44,7 +45,8 @@ const GROUPS: Group[] = [
   { id: 'settings', label: '설정', icon: SettingsIcon, admin: true, items: [{ id: 'settings', label: '설정', icon: SettingsIcon, admin: true }] },
 ];
 const NAV = GROUPS.flatMap((g) => g.items);
-const groupOf = (p: Page) => GROUPS.find((g) => g.items.some((i) => i.id === p))!;
+// 메뉴에 없는 화면(마이페이지)은 개요 묶음 아래에 그린다
+const groupOf = (p: Page) => GROUPS.find((g) => g.items.some((i) => i.id === p)) ?? GROUPS[0];
 
 // 아래 도크 — 자주 가는 곳. 색은 파스텔 동그라미
 const DOCK: { id: Page | 'board'; label: string; icon: Icon; tone: string }[] = [
@@ -57,11 +59,11 @@ const DOCK: { id: Page | 'board'; label: string; icon: Icon; tone: string }[] = 
 
 const initialPage = (): Page => {
   const h = location.hash.slice(1).split('?')[0].split('/')[0] as Page;
-  return NAV.some((n) => n.id === h) ? h : 'overview';
+  return NAV.some((n) => n.id === h) || h === 'account' ? h : 'overview';
 };
 const SPRING = { type: 'spring', stiffness: 520, damping: 40, mass: 0.9 } as const;
 
-function UserMenu({ me, onTheme }: { me: Me & { authenticated: true }; onTheme: () => void }) {
+function UserMenu({ me, onTheme, onAccount }: { me: Me & { authenticated: true }; onTheme: () => void; onAccount: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -76,12 +78,13 @@ function UserMenu({ me, onTheme }: { me: Me & { authenticated: true }; onTheme: 
     <div className="fr-user" ref={ref}>
       <button className="fr-user-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
         <Avatar login={me.login} size={30} />
-        <span className="fr-user-txt"><b>{me.login}</b><small>{ROLE}</small></span>
+        <span className="fr-user-txt"><b>{me.name || me.login}</b><small>{ROLE}</small></span>
         <ChevronDown size={15} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
       </button>
       <AnimatePresence>
         {open && (
           <motion.div className="fr-user-pop" initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.16 }}>
+            <button onClick={() => { onAccount(); setOpen(false); }}><UserRound size={15} />마이페이지</button>
             <button onClick={() => { onTheme(); setOpen(false); }}>{dark ? <Sun size={15} /> : <Moon size={15} />}{dark ? '밝게 보기' : '어둡게 보기'}</button>
             <button onClick={() => api.logout().then(() => location.replace('/'))}><LogOut size={15} />로그아웃</button>
           </motion.div>
@@ -151,7 +154,7 @@ export function App() {
   }, []);
 
   if (me === null) return <div className="login-wrap"><span className="muted">loading…</span></div>;
-  if (!me.authenticated) return <Login />;
+  if (!me.authenticated) return <AuthPages />;
   const groups = GROUPS.filter((g) => !g.admin || me.admin);
   const g = groupOf(page);
   const rail = g.items.filter((n) => !n.admin || me.admin);
@@ -186,7 +189,7 @@ export function App() {
               })}
             </nav>
           </LayoutGroup>
-          <UserMenu me={me as Me & { authenticated: true }} onTheme={toggleTheme} />
+          <UserMenu me={me as Me & { authenticated: true }} onTheme={toggleTheme} onAccount={() => setPage('account')} />
         </header>
 
         <div className="fr-canvas">
@@ -240,6 +243,7 @@ export function App() {
                 {page === 'tools' && <Tools />}
                 {page === 'docs' && <Docs initial={docsService} />}
                 {page === 'settings' && me.admin && <Settings me={me.login} />}
+                {page === 'account' && <MyPage onChanged={() => api.me().then(setMe).catch(() => undefined)} />}
               </motion.div>
             </AnimatePresence>
           </main>
