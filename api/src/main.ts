@@ -10,6 +10,7 @@ import { BoardService } from './board/board.service.js';
 import { assertConfig, cfg } from './config.js';
 import { testbedProxy } from './testbed-proxy.js';
 import { closePersist, initPersist, persistInfo } from './persist.js';
+import { banner } from './banner.js';
 
 async function bootstrap() {
   assertConfig();
@@ -56,6 +57,11 @@ async function bootstrap() {
   });
 
   await app.listen(cfg.port, '0.0.0.0');
-  console.log(`rosie-console, 포트 ${cfg.port}, 주소 ${cfg.publicUrl}, GitHub ${cfg.githubWeb}/${cfg.owner}, 처음 관리자 ${cfg.admins.join(',')}, 조직 ${cfg.orgs.join(',') || '없음'}, 저장 ${persistInfo().driver}`);
+  console.log(banner([
+    'Rosie 콘솔',
+    `${cfg.publicUrl}  (포트 ${cfg.port})`,
+    `GitHub ${cfg.githubWeb}/${cfg.owner}${cfg.orgs.length ? ` + ${cfg.orgs.join(', ')}` : ''}`,
+    `처음 관리자 ${cfg.admins.join(', ')} · 저장 ${persistInfo().driver}`,
+  ]));
 }
 bootstrap().catch((e) => { console.error('[시작 실패]', e?.message || e); process.exit(1); });
