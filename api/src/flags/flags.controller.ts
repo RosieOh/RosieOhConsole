@@ -2,7 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards 
 import type { Request } from 'express';
 import { AuthGuard, DeployerOnly } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import { FlagsService } from './flags.service.js';
 
 @UseGuards(AuthGuard)
@@ -21,7 +21,7 @@ export class FlagsController {
   @Post()
   set(@Req() req: Request, @Body() body: any) {
     const origin = req.get('origin');
-    if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
     return this.flags.set(sessionOf(req)!.login, body || {});
   }
 }

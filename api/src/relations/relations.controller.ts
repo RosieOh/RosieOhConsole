@@ -2,12 +2,12 @@ import { Body, Controller, ForbiddenException, Get, Post, Req, UseGuards } from 
 import type { Request } from 'express';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import { RelationsService } from './relations.service.js';
 
 const sameOrigin = (req: Request) => {
   const origin = req.get('origin');
-  if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
 };
 
 @UseGuards(AuthGuard)

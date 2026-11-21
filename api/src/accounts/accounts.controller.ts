@@ -4,14 +4,14 @@ import { audit } from '../audit.js';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { giveSession, httpOf } from '../auth/auth.controller.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import {
   ADMIN_ACTIONS, AdminAction, adminAction, bumpSession, changePassword, listAccounts, myPage, publicAccount, unlinkGithub, updateProfile, withdraw,
 } from './accounts.js';
 
 const sameOrigin = (req: Request) => {
   const origin = req.get('origin');
-  if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
 };
 const me = (req: Request) => sessionOf(req)!.login;
 

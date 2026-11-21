@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import { ApksService } from './apks.service.js';
 import { contentDisposition, rateLimiter } from './release.js';
 import { WHO_RE } from './knox.js';
@@ -36,7 +36,7 @@ export class ApksController {
   @Post(':repo/knox')
   async knox(@Param('repo') repo: string, @Body() b: { tag?: string; by?: string; undo?: boolean }, @Req() req: Request) {
     const origin = req.get('origin');
-    if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
     const by = sessionOf(req)?.login ?? String(b?.by || '').trim();
     if (!WHO_RE.test(by)) throw new BadRequestException('이름을 입력하세요');
     try { await this.apks.markKnox(repo, String(b?.tag || ''), sessionOf(req) ? by : `${by}(${req.ip})`, !!b?.undo); }
@@ -55,7 +55,7 @@ export class ApksController {
     const s = sessionOf(req);
     if (!s) throw new ForbiddenException('로그인한 사람만 출고 기록을 고칠 수 있습니다');
     const origin = req.get('origin');
-    if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
     try { return await this.apks.saveShipped(repo, b?.from ? String(b.from) : null, b?.remove ? null : b?.rec ?? {}, s.login, typeof b?.rev === 'number' ? b.rev : undefined); }
     catch (e: any) { throw new BadRequestException(e?.message); }
   }
@@ -66,7 +66,7 @@ export class ApksController {
     const s = sessionOf(req);
     if (!s) throw new ForbiddenException('로그인한 사람만 메모를 쓸 수 있습니다');
     const origin = req.get('origin');
-    if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
     try { await this.apks.setNote(repo, String(b?.tag || ''), String(b?.text ?? ''), s.login); } catch (e: any) { throw new BadRequestException(e?.message); }
     return { ok: true };
   }
