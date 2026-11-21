@@ -1,0 +1,28 @@
+# 서버 점검 — 서버를 맡은 저장소의 .github/workflows/probe.yml 로 복사해 쓴다(scripts/new-server.bash 가 만들어 준다).
+# 15분마다 점검하고, 콘솔 서버 화면의 [점검]·[로그]·[다시 시작]이 이 워크플로를 부른다(workflow_dispatch).
+# 필요: 시크릿 PROD_SSH_KEY · PROD_SSH_KNOWN_HOSTS · PROBE_TOKEN(콘솔 .env 와 같은 값), 변수 CONSOLE_URL(https://콘솔 주소)
+name: probe
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      action:  { description: 'probe · logs · restart', default: 'probe' }
+      target:  { description: '서비스 이름(logs·restart)', default: '' }
+      lines:   { description: '로그 줄 수', default: '300' }
+      confirm: { description: 'restart 일 때 target 을 그대로', default: '' }
+
+jobs:
+  probe:
+    uses: RosieOh/RosieOhConsole/.github/workflows/server-probe.yml@main
+    with:
+      server: __SERVER__
+      ssh-host: '__SSH_HOST__'
+      ssh-port: '__SSH_PORT__'
+      key: __KEY__
+      action: ${{ github.event.inputs.action || 'probe' }}
+      target: ${{ github.event.inputs.target || '' }}
+      lines: ${{ github.event.inputs.lines || '300' }}
+      confirm: ${{ github.event.inputs.confirm || '' }}
+    secrets: inherit

@@ -8,6 +8,7 @@
 //     web-api     --file --name --pascal --camel [--store]       web/src/api.ts 에 클라이언트 함수·타입
 //     mock        --file --name                                  web/dev/mock-api.mjs 에 가짜 응답
 //     catalog     --file --group --project --key --name --kind --repo [--group-name --project-name --note --prod]
+//     infra       --file --id --name --repo [--ip --domains --note --key]   api/src/infra/defaults.ts 에 점검할 서버
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -130,6 +131,20 @@ const commands = {
         `  ['GET', /^\\/${a.name}$/, () => (${body})],`);
       if (a.store) L.push(`  ['POST', /^\\/${a.name}$/, () => ({ ok: true, rev: 2 })],`, `  ['DELETE', /^\\/${a.name}\\/[^/]+$/, () => ({ ok: true, rev: 2 })],`);
       L.push(');', '');
+    });
+  },
+
+  infra() {
+    need('id', 'name', 'repo');
+    const { id } = a;
+    const sub = [a.ip, ...(a.domains ? a.domains.split(',').map((x) => x.trim()).filter(Boolean) : []), a.note].filter(Boolean).join(', ');
+    const hosts = [a.ip, ...(a.domains ? a.domains.split(',').map((x) => x.trim()).filter(Boolean) : [])].filter(Boolean);
+    const line = `  { id: '${q(id)}', kind: 'server', name: '${q(a.name)}'${sub ? `, sub: '${q(sub)}'` : ''}${hosts.length ? `, hosts: [${hosts.map((h) => `'${q(h)}'`).join(', ')}]` : ''}, probe: { repo: '${q(a.repo)}', key: '${a.key === 'dev' ? 'dev' : 'prod'}' } },`;
+    edit((L) => {
+      const i0 = indexOr(L, /^export const DEFAULT_INFRA: InfraDef\[\] = \[$/, 'export const DEFAULT_INFRA: InfraDef[] = [');
+      const i1 = indexOr(L, /^\];$/, 'DEFAULT_INFRA 의 끝(];)', i0);
+      if (L.slice(i0, i1).some((l) => l.includes(`id: '${id}'`))) fail(`서버 id '${id}' 는 이미 있습니다`);
+      L.splice(i1, 0, line);
     });
   },
 
