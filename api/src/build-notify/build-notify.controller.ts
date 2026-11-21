@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { audit } from '../audit.js';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import { RevConflict } from '../json-store.js';
 import { BuildNotifyChange, buildRecipients, changeBuildNotify, getBuildNotify } from './build-notify.js';
 
@@ -27,7 +27,7 @@ export class BuildNotifyController {
   @AdminOnly()
   async change(@Req() req: Request, @Body() b: BuildNotifyChange & { rev?: number }) {
     const origin = req.get('origin');
-    if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
     const me = sessionOf(req)!.login;
     const body = b ?? {};
     try { changeBuildNotify(me, body, body.rev); }

@@ -1,7 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, HttpException, Post, Query, Req, Res } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { cfg, secureCookie } from '../config.js';
+import { cfg, secureCookie, originOk } from '../config.js';
 import { audit } from '../audit.js';
 import { AccountError, githubLogin, linkGithub, passwordLogin, signup } from '../accounts/accounts.js';
 import { authorizeUrl, exchangeCode, whoAmI } from './github-oauth.js';
@@ -10,7 +10,7 @@ import { SESSION_COOKIE, STATE_COOKIE, TTL_MS, sessionOf, signSession } from './
 const cookieOpts = () => ({ httpOnly: true, secure: secureCookie(), sameSite: 'lax' as const, path: '/' });
 const sameOrigin = (req: Request) => {
   const origin = req.get('origin');
-  if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
 };
 /** 계정 오류 → HTTP 오류(화면이 code 로 갈래를 탄다) */
 export const httpOf = (e: unknown) => (e instanceof AccountError ? new HttpException({ message: e.message, code: e.code }, e.status) : e);

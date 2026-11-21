@@ -2,13 +2,13 @@ import { Body, Controller, ForbiddenException, Get, Headers, HttpCode, Param, Po
 import type { Request } from 'express';
 import { AuthGuard, DeployerOnly } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import { RelationsService } from '../relations/relations.service.js';
 import { ServersService } from './servers.service.js';
 
 const sameOrigin = (req: Request) => {
   const origin = req.get('origin');
-  if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
 };
 
 // 받는 쪽 — 로그인 없이, PROBE_TOKEN 으로(본문은 main.ts 에서 text 로 읽는다)

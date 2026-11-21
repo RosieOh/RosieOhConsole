@@ -21,6 +21,8 @@ export const cfg = {
   sessionSecret: process.env.SESSION_SECRET || '',
   // 처음 관리자이자 로그인할 수 있는 GitHub 계정(쉼표로 여럿). 권한 화면에서 더 추가할 수 있다
   admins: list(process.env.CONSOLE_ADMINS, process.env.GITHUB_OWNER || 'RosieOh'),
+  // 쓰기 요청을 받아 줄 다른 출처(쉼표로 여럿) — PUBLIC_URL 은 늘 허용. 예) 개발 중 Vite 를 다른 주소로 띄울 때
+  allowedOrigins: list(process.env.ALLOWED_ORIGINS).map((o) => o.replace(/\/$/, '')),
   // 테스트배드 — API 문서·테스터가 이 주소로 대신 호출한다(/mxtest/*). 비우면 꺼진다
   testbedUrl: (process.env.TESTBED_URL || '').replace(/\/$/, ''),
   // 콘솔이 직접 갖는 데이터(감사 로그·배포 기록 캐시)
@@ -28,6 +30,8 @@ export const cfg = {
 };
 
 export const secureCookie = () => cfg.publicUrl.startsWith('https://');
+/** 쓰기 요청의 Origin 검사 — 없으면(같은 출처 GET·서버 간 호출) 통과, 있으면 PUBLIC_URL·ALLOWED_ORIGINS 중 하나여야 */
+export const originOk = (origin: string | undefined) => !origin || origin === cfg.publicUrl || cfg.allowedOrigins.includes(origin);
 /** 저장소 이름 → '<주인>/<저장소>'. '/' 가 있으면(조직 저장소) 그대로 */
 export const full = (repo: string) => (repo.includes('/') ? repo : `${cfg.owner}/${repo}`);
 export const repoUrl = (repo: string) => `${cfg.githubWeb}/${full(repo)}`;

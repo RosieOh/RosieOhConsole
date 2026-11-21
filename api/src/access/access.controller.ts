@@ -3,13 +3,13 @@ import type { Request } from 'express';
 import { audit } from '../audit.js';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg } from '../config.js';
+import { cfg, originOk } from '../config.js';
 import { RevConflict } from '../json-store.js';
 import { LOGIN_RE, Role, listAccess, roleOf, setRole } from './access.js';
 
 const sameOrigin = (req: Request) => {
   const origin = req.get('origin');
-  if (origin && origin !== cfg.publicUrl) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
 };
 
 // 프로필 사진은 GitHub 의 공개 주소로 — API 호출 없이

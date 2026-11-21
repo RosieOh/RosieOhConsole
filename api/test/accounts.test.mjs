@@ -129,3 +129,35 @@ test('관리자 조치·탈퇴 — 처음 관리자·자기 자신은 막는다,
   A.adminAction('boss', 'erin', 'delete');
   assert.equal(A.getAccount('erin'), null);
 });
+
+test('터미널 비밀번호 — 처음 관리자는 계정이 없어도 만들고, 모르는 사람은 거절', async () => {
+  // 처음 관리자 'boss' 계정은 앞 시험에서 GitHub 로그인으로 생겼다 → 비밀번호만 정해지고 세션 판 번호가 오른다
+  const before = A.getAccount('boss').sv;
+  const r = A.setPasswordDirect('Boss', 'first-admin-7');
+  assert.equal(r.created, false);
+  assert.ok(A.getAccount('boss').sv > before);
+  assert.ok(A.passwordLogin('boss', 'first-admin-7', '10.2.2.2'));
+  assert.equal(code(() => A.setPasswordDirect('nobody', 'some-pass-12')), 'not_found');
+  assert.equal(code(() => A.setPasswordDirect('boss', 'short')), 'bad_password');
+
+  // 계정이 아직 없는 처음 관리자(새 DATA_DIR)
+  const { cfg } = await import('../dist/config.js');
+  cfg.dataDir = mkdtempSync(tmpdir() + '/mxc-accounts2-');   // 설정은 시작할 때 읽으므로 값을 직접 바꾼다
+  A._resetAccounts();
+  const made = A.setPasswordDirect('Boss', 'first-admin-7');
+  assert.equal(made.created, true);
+  assert.equal(made.account.status, 'active');
+  assert.equal(made.account.role, 'admin');
+  assert.ok(A.passwordLogin('boss', 'first-admin-7', IP));
+});
+
+test('쓰기 요청 출처 — PUBLIC_URL·ALLOWED_ORIGINS 만, Origin 이 없으면 통과', async () => {
+  const { cfg, originOk } = await import('../dist/config.js');
+  const saved = [...cfg.allowedOrigins];
+  assert.equal(originOk(undefined), true);
+  assert.equal(originOk(cfg.publicUrl), true);
+  assert.equal(originOk('http://evil.example'), false);
+  cfg.allowedOrigins.push('http://localhost:5173');
+  assert.equal(originOk('http://localhost:5173'), true);
+  cfg.allowedOrigins.splice(0, cfg.allowedOrigins.length, ...saved);
+});
