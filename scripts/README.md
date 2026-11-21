@@ -27,6 +27,7 @@ scripts/new-app.bash rosie-notes --name "Rosie Notes" --kind web --group web --n
 | 스크립트 | 하는 일 |
 |---|---|
 | `setup-env.bash` | `.env.example` → `.env`, `SESSION_SECRET` 생성, 빈 값은 물어서 채움 |
+| `set-password.bash <아이디>` | 계정 비밀번호를 터미널에서 정한다(입력 숨김). 처음 관리자는 계정이 없어도 만든다 — GitHub 로그인 전이나 비밀번호를 잊었을 때 |
 | `dev.bash [--mock]` | api(8087) + web(Vite 5173) 을 같이 띄우고 Ctrl+C 로 둘 다 끔. `--mock` 은 토큰 없이 가짜 API |
 | `check.bash [api\|web] [--build]` | api 빌드·시험, web 타입 검사·시험 — 커밋 전에 |
 

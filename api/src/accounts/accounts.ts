@@ -231,6 +231,26 @@ export function withdraw(login: string, b: { password?: string; confirm?: string
   try { setRole(a.login, a.login, 'none'); } catch { /* 명단에 없었다 */ }
 }
 
+// ── 터미널에서 비밀번호 정하기(scripts/set-password.bash) ──
+/**
+ * 화면에 들어올 방법이 없을 때(처음 관리자가 GitHub 로그인을 아직 못 할 때, 비밀번호를 잊었을 때) 서버 쪽에서 정한다.
+ * 계정이 없으면 처음 관리자·권한 명단에 있는 사람만 만들어 준다. 바꾸면 그 사람의 기존 세션은 끊긴다
+ */
+export function setPasswordDirect(loginIn: string, pw: string) {
+  const login = norm(loginIn);
+  const why = passwordProblem(pw, login);
+  if (why) throw new AccountError('bad_password', why);
+  const a = getAccount(login);
+  if (!a) {
+    if (!isRoot(login) && !isAllowed(login)) throw new AccountError('not_found', `계정 '${login}' 이 없습니다(처음 관리자·권한 명단에 있는 사람만 새로 만든다)`, 404);
+    const made: Account = { login, name: loginIn, email: '', password: hashPassword(pw), status: 'active', createdAt: now(), via: 'admin', sv: 0, history: [] };
+    write((d) => { d.users[login] = made; });
+    return { created: true, account: publicAccount(made) };
+  }
+  write((d) => { const x = d.users[login]; x.password = hashPassword(pw); x.sv = (x.sv || 0) + 1; });
+  return { created: false, account: publicAccount(getAccount(login)!) };
+}
+
 // ── 관리자 ──
 export type AdminAction = 'approve' | 'reject' | 'suspend' | 'activate' | 'reset-password' | 'delete';
 export const ADMIN_ACTIONS: AdminAction[] = ['approve', 'reject', 'suspend', 'activate', 'reset-password', 'delete'];
