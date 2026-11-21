@@ -6,6 +6,8 @@ RUN npm ci --no-audit --no-fund
 ARG VITE_GITHUB_OWNER=RosieOh
 ENV VITE_GITHUB_OWNER=$VITE_GITHUB_OWNER
 COPY web/ ./
+# 업무보드 화면의 단계 정의가 서버와 같은지 보는 시험(stages.test.ts)이 이 파일을 읽는다
+COPY api/src/board/derive.ts /api/src/board/derive.ts
 RUN npm run build && npm test
 
 # ── api (NestJS 12, ESM) 빌드 ──────────────────────────
