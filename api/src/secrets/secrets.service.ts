@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { audit } from '../audit.js';
 import { cfg, full, REPO_RE } from '../config.js';
 import { ghFetch, ghJson, ghPaged, ownerRepos } from '../github.js';
+import { sealSecret } from './seal.js';
 import {
   Perm, RefKind, TeamInfo, TemplateUse, Usage, WorkflowFile, canManage, canUse, checkName, explainPerm, repoUsage, unitPerm,
 } from './scan.js';
@@ -210,12 +211,19 @@ export class SecretsService {
     if (had && b.confirm !== name) throw new BadRequestException(`이미 있는 ${kind === 'secret' ? '시크릿' : '변수'}입니다, 바꾸려면 이름 "${name}" 을 그대로 입력하세요`);
     const desc = b.description !== undefined ? String(b.description).slice(0, 200) : undefined;
     let res: Response;
-    // GitHub 시크릿은 저장소 공개키로 봉인(libsodium sealed box)해서 보내야 한다 — 아직 붙이지 않았다
-    if (kind === 'secret') throw new ServiceUnavailableException('시크릿 값 쓰기는 아직 GitHub 암호화 연동 전입니다, 저장소 설정에서 바꾸세요');
-    void desc;   // GitHub 변수엔 설명 칸이 없다
-    res = had
-      ? await this.send(`${t.base}/actions/variables/${encodeURIComponent(name)}`, 'PATCH', { name, value })
-      : await this.send(`${t.base}/actions/variables`, 'POST', { name, value });
+    void desc;   // GitHub 시크릿·변수엔 설명 칸이 없다
+    if (kind === 'secret') {
+      // 저장소 공개키로 봉인해서 보낸다 — 평문 값은 GitHub 으로도, 로그·감사로도 가지 않는다
+      const pk = await this.send(`${t.base}/actions/secrets/public-key`, 'GET');
+      if (!pk.ok) throw new BadRequestException(`저장소 공개키를 받지 못했습니다(HTTP ${pk.status})`);
+      const { key, key_id } = await pk.json() as { key: string; key_id: string };
+      const encrypted_value = await sealSecret(value, key);
+      res = await this.send(`${t.base}/actions/secrets/${encodeURIComponent(name)}`, 'PUT', { encrypted_value, key_id });
+    } else {
+      res = had
+        ? await this.send(`${t.base}/actions/variables/${encodeURIComponent(name)}`, 'PATCH', { name, value })
+        : await this.send(`${t.base}/actions/variables`, 'POST', { name, value });
+    }
     const ok = res.ok;
     await audit({ login, action: `${kind}.${had ? 'replace' : 'create'}`, target: `${t.label}/${name}`, detail: had ? '값 교체' : '새로 만듦', ok });
     if (!ok) throw new BadRequestException(`GitHub 이 HTTP ${res.status} 로 거절했습니다`);
