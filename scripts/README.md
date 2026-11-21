@@ -29,6 +29,7 @@ scripts/new-app.bash rosie-notes --name "Rosie Notes" --kind web --group web --n
 | `setup-env.bash` | `.env.example` → `.env`, `SESSION_SECRET` 생성, 빈 값은 물어서 채움 |
 | `dev.bash [--mock]` | api(8087) + web(Vite 5173) 을 같이 띄우고 Ctrl+C 로 둘 다 끔. `--mock` 은 토큰 없이 가짜 API |
 | `check.bash [api\|web] [--build]` | api 빌드·시험, web 타입 검사·시험 — 커밋 전에 |
+| `git/setup-claude.bash [--check\|--remove]` | CLAUDE.md 에 Git·GitHub 규칙, commit-msg 훅(`TYPE : 본문` 검사·AI 서명 제거), 커밋 템플릿, `.claude/settings.json`. 파일 하나로 다른 저장소에서도 쓴다 |
 
 ## 구조
 
