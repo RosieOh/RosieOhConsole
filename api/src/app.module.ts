@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AccessController, UsersController } from './access/access.controller.js';
+import { AccountController, AccountsAdminController } from './accounts/accounts.controller.js';
 import { ApksController } from './apks/apks.controller.js';
 import { ApksService } from './apks/apks.service.js';
 import { AppController } from './app.controller.js';
@@ -35,7 +36,7 @@ import { ToolsService } from './tools/tools.service.js';
 
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [AppController, AuthController, DocsController, ToolsController, ApksController, DeployController, CatalogController, PublicController, AccessController, UsersController, RunnersController, SecretsController, RelationsController, FlowController, PromoteController, ServersController, ProbeIngestController, FlagsController, BuildNotifyController],
+  controllers: [AppController, AuthController, AccountController, AccountsAdminController, DocsController, ToolsController, ApksController, DeployController, CatalogController, PublicController, AccessController, UsersController, RunnersController, SecretsController, RelationsController, FlowController, PromoteController, ServersController, ProbeIngestController, FlagsController, BuildNotifyController],
   providers: [StatusService, ToolsService, ApksService, DeployService, StoreAppsService, BoardService, CatalogService, RunnersService, SecretsService, AuthGuard, RelationsService, FlowService, PromoteService, ServersService, FlagsService],
 })
 export class AppModule {}
