@@ -192,3 +192,16 @@ test('기본 카탈로그 — 키·저장소가 겹치지 않고, 구성요소�
   const { components } = buildCatalog(DEFAULT_NODES, DEFAULT_COMPONENTS, emptyOverrides());
   assert.ok(!components.some((c) => c.project === UNASSIGNED));
 });
+
+test('구성요소 종류 — 데스크톱 앱·도구·노트북도 추가할 수 있다', async () => {
+  const { KINDS } = await import('../dist/catalog/types.js');
+  for (const k of ['desktop-app', 'tool', 'notebook']) assert.ok(KINDS.includes(k), k);
+  const { DEFAULT_COMPONENTS } = await import('../dist/catalog/defaults.js');
+  assert.equal(DEFAULT_COMPONENTS.find((c) => c.key === 'trove').kind, 'desktop-app');
+  assert.equal(DEFAULT_COMPONENTS.find((c) => c.key === 'korean-notice-mcp').kind, 'tool');
+  const svc = new CatalogService();
+  const g = svc.apply('boss', svc.view().rev, [{ op: 'node.add', type: 'group', name: 'Kinds' }]);
+  const p = svc.apply('boss', g.rev, [{ op: 'node.add', type: 'project', name: 'KindsProj', parent: g.added[0] }]);
+  const r = svc.apply('boss', p.rev, [{ op: 'comp.add', name: 'CLI', kind: 'tool', parent: p.added[0] }]);
+  assert.equal(svc.view().components.find((c) => c.key === r.added[0]).kind, 'tool');
+});

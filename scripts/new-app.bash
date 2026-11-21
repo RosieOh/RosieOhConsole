@@ -6,7 +6,7 @@
 #
 #   <key>            구성요소 key, kebab-case (카탈로그 전체에서 하나)
 #   --name           화면에 보일 이름 (필수)
-#   --kind           backend | web | device-app | store-app (필수)
+#   --kind           backend | web | device-app | store-app | desktop-app | tool | notebook (필수)
 #   --group          그룹 id: ai platform backend web apps lab data study … (필수)
 #   --group-name     그룹이 없을 때 새로 만들 그룹 이름
 #   --project        프로젝트 id (기본: key). 있으면 그 프로젝트에 구성요소를 더한다
@@ -50,7 +50,7 @@ PROJECT="${PROJECT:-$KEY}"; REPO="${REPO:-$KEY}"
 is_kebab "$KEY" || die "key 는 kebab-case 로: $KEY"
 is_kebab "$PROJECT" || die "--project 는 kebab-case 로: $PROJECT"
 is_kebab "$GROUP" || die "--group 은 kebab-case 로: $GROUP"
-case "$KIND" in backend|web|device-app|store-app) ;; *) die "--kind 는 backend | web | device-app | store-app" ;; esac
+case "$KIND" in backend|web|device-app|store-app|desktop-app|tool|notebook) ;; *) die "--kind 는 backend | web | device-app | store-app | desktop-app | tool | notebook" ;; esac
 printf '%s' "$REPO" | grep -Eq '^([A-Za-z0-9-]{1,39}/)?[A-Za-z0-9._-]{1,100}$' || die "저장소 이름이 올바르지 않습니다: $REPO"
 [ -z "$PROD" ] || printf '%s' "$PROD" | grep -Eq '^https?://' || die "--prod 는 http(s):// 주소로"
 need node

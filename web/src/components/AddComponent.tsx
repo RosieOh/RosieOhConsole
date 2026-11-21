@@ -1,4 +1,4 @@
-import { Check, Globe, RefreshCw, Search, Server, Smartphone, Store, X } from 'lucide-react';
+import { Check, FlaskConical, Globe, Laptop, RefreshCw, Search, Server, Smartphone, Store, Wrench, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { api, CatalogComponent, CatalogNode, GhRepo, Kind } from '../api';
 
@@ -8,12 +8,18 @@ const KINDS: { k: Kind; icon: React.ReactNode; label: string; desc: string }[] =
   { k: 'store-app', icon: <Store size={18} />, label: '스토어 앱', desc: '플레이스토어, 앱스토어로 나가는 앱' },
   { k: 'backend', icon: <Server size={18} />, label: '백엔드', desc: '앱이 부르는 서버' },
   { k: 'web', icon: <Globe size={18} />, label: '웹', desc: '브라우저로 여는 화면' },
+  { k: 'desktop-app', icon: <Laptop size={18} />, label: '데스크톱 앱', desc: 'Electron 등 컴퓨터에 까는 앱' },
+  { k: 'tool', icon: <Wrench size={18} />, label: '도구·라이브러리', desc: 'CLI, MCP 서버, 확장, 라이브러리' },
+  { k: 'notebook', icon: <FlaskConical size={18} />, label: '노트북·분석', desc: '데이터 분석, 모델링 노트북' },
 ];
 const AFTER: Record<Kind, string> = {
   'device-app': '저장소에 APK 배포가 설정돼 있으면 APK 보관함과 배포 흐름에 바로 나옵니다.',
   'store-app': '서비스 트리에 나옵니다. 스토어 배포 버튼은 개발자가 배포 설정을 넣어야 생깁니다.',
   backend: '서비스 트리에 나옵니다. 배포 화면의 주소와 배포 버튼은 개발자가 설정을 넣어야 생깁니다.',
   web: '서비스 트리에 나옵니다. 배포 화면의 주소와 배포 버튼은 개발자가 설정을 넣어야 생깁니다.',
+  'desktop-app': '서비스 트리에 나옵니다. 릴리스는 저장소의 GitHub Releases 에서 봅니다.',
+  tool: '서비스 트리에 나옵니다. 설치 안내가 필요하면 개발 › 도구 목록(api/src/tools/catalog.ts)에 적습니다.',
+  notebook: '서비스 트리에 나옵니다.',
 };
 
 function ago(iso: string) {

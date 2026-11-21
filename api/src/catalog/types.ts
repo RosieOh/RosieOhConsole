@@ -2,8 +2,10 @@ import type { DeployTrack, Endpoint } from '../registry.js';
 
 // 카탈로그 — 그룹 → (그룹 …) → 프로젝트 → 구성요소
 export type NodeType = 'group' | 'project';
-export type ComponentKind = 'backend' | 'web' | 'device-app' | 'store-app';
-export const KINDS: ComponentKind[] = ['backend', 'web', 'device-app', 'store-app'];
+// backend·web 은 상태·배포가 붙는다. device-app(APK)·store-app(스토어)은 앱 배포. 나머지는 이름·로고·저장소만(배포 연결 없음)
+//   desktop-app = 데스크톱 앱(Electron 등), tool = CLI·MCP 서버·확장·라이브러리, notebook = 노트북·데이터 분석
+export type ComponentKind = 'backend' | 'web' | 'device-app' | 'store-app' | 'desktop-app' | 'tool' | 'notebook';
+export const KINDS: ComponentKind[] = ['backend', 'web', 'device-app', 'store-app', 'desktop-app', 'tool', 'notebook'];
 
 export interface NodeDef { id: string; type: NodeType; name: string; parent?: string; order: number }
 

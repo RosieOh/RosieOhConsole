@@ -141,8 +141,8 @@ export async function callTestbed(method: string, path: string, token?: string, 
 }
 
 // ── 카탈로그(#18) ──
-export type Kind = 'backend' | 'web' | 'device-app' | 'store-app';
-export const KIND_LABEL: Record<Kind, string> = { backend: '백엔드', web: '웹', 'device-app': '기기앱(APK)', 'store-app': '스토어 앱' };
+export type Kind = 'backend' | 'web' | 'device-app' | 'store-app' | 'desktop-app' | 'tool' | 'notebook';
+export const KIND_LABEL: Record<Kind, string> = { backend: '백엔드', web: '웹', 'device-app': '기기앱(APK)', 'store-app': '스토어 앱', 'desktop-app': '데스크톱 앱', tool: '도구·라이브러리', notebook: '노트북·분석' };
 export interface GhRepo { name: string; description: string; updated: string; archived: boolean }
 export interface CatalogComponent {
   key: string; name: string; kind: Kind; repo: string; project: string; order: number; logo: string | null; ownLogo: string | null; note?: string;
