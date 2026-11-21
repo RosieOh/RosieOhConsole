@@ -23,7 +23,9 @@
 | 영역 | 상태 |
 |---|---|
 | 로그인 | GitHub OAuth. `CONSOLE_ADMINS` + 권한 화면에 추가한 계정만 |
-| 카탈로그 | RosieOh 저장소 84개(포크·프로필 제외)를 8개 그룹으로 `api/src/catalog/defaults.ts` 에. 공개 사이트가 있는 것(대동여지도·RosieTechBlog)만 운영 헬스. 배포 트랙은 아직 없음 |
+| 카탈로그 | RosieOh 저장소 84개(포크·프로필 제외) + 조직 MarioChunjaeIT 6개를 8개 그룹으로 `api/src/catalog/defaults.ts` 에. 공개 사이트가 있는 것(대동여지도·RosieTechBlog)만 운영 헬스. 배포 트랙은 아직 없음 |
+| 조직 | `GITHUB_ORGS` 의 조직 저장소를 저장소 고르기·러너·시크릿·배포 등에서 함께 다룬다. 콘솔 안의 저장소 이름은 `<조직>/<저장소>`(주인 저장소는 이름만) |
+| 저장 | `DATABASE_URL` 이 있으면 MariaDB, 없으면 파일. 콘솔은 한 대만 띄운다고 본다 |
 | 배포·흐름·운영 반영 | GitHub Actions API 로 옮김. 카탈로그에 배포 트랙을 적어야 나온다 |
 | 러너 | 저장소별 셀프 호스티드 러너 + 최근 push 한 저장소 10개의 최근 실행 5개씩의 작업 |
 | 시크릿 | 목록·사용처·변수 쓰기는 됨. **시크릿 값 쓰기는 저장소 공개키 봉인(libsodium sealed box)이 필요해 꺼 둠** |
@@ -35,7 +37,10 @@
 ## 기술
 - **web**: React 19 · Vite 8 · TypeScript 7. 업무보드 화면도 여기(`web/src/board/`) — 한 SPA, 한 빌드
 - **api**: NestJS 12 (ESM) · Express 5 · Node 22 — `/dashapi/*` + 화면 정적 서빙(단일 컨테이너)
-- 데이터는 DB 없이 `DATA_DIR`(기본 `/data`)의 JSON 파일: `catalog.json` · `access.json` · `audit.jsonl` · `schedules.json` · `relations.json` …
+- 저장(`api/src/persist.ts`): `DATABASE_URL` 이 있으면 **MariaDB**, 없으면 `DATA_DIR`(기본 `/data`)의 JSON 파일(로컬 개발·시험)
+  - `store(name, rev, value)` — 문서 하나가 한 줄: `catalog` · `access` · `schedules` · `relations` · `deploy-readings` …(파일 모드의 `<name>.json` 과 같은 이름)
+  - `audit` — 감사 로그, `blob_file` — 로고 그림
+  - 표는 시작할 때 스스로 만든다. 문서는 시작할 때 메모리로 읽고, 쓰기는 메모리 → DB 차례로. DB 에 없고 `DATA_DIR` 에 옛 파일이 있으면 처음 한 번 옮겨 온다
 - GitHub 호출은 `api/src/github.ts`(`ghFetch`·`ghJson`·`ghRaw`·`ghPaged`·`ownerRepos`) 한 곳으로
 
 ## 환경변수
@@ -49,6 +54,13 @@ OAUTH_CLIENT_ID=… OAUTH_CLIENT_SECRET=… SESSION_SECRET=$(openssl rand -hex 3
 cd web && npm ci && npm run dev        # Vite (/dashapi·/mxtest·/board/api → 8087)
 ```
 
+MariaDB 로 띄우려면(이 컴퓨터에 MariaDB 가 3306 을 쓰고 있어도 겹치지 않게 3307):
+```
+docker compose up -d mariadb
+DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console … node dist/main.js
+TEST_DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console npm test   # MariaDB 시험까지
+```
+
 토큰 없이 화면만 보려면 가짜 API 를 쓴다. 모르는 경로는 404 와 함께 터미널에 찍히니, 화면이 비면 거기 보고 `ROUTES` 에 추가한다.
 ```
 cd web && node dev/mock-api.mjs        # 8087
@@ -56,4 +68,4 @@ cd web && npm run dev                  # 다른 터미널
 ```
 
 ## 배포
-아직 정하지 않았다. `Dockerfile` 은 web·api 빌드와 시험을 거쳐 한 이미지(포트 8087, 데이터 `/data` 볼륨)를 만든다.
+아직 정하지 않았다. `Dockerfile` 은 web·api 빌드와 시험을 거쳐 한 이미지(포트 8087)를 만든다. `docker compose up -d --build` 는 MariaDB 와 콘솔을 함께 띄운다(`.env` 필요).
