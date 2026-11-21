@@ -1,71 +1,70 @@
 # Rosie 콘솔
 
-[RosieOh](https://github.com/RosieOh) 의 GitHub 저장소를 한곳에서 보는 개인 콘솔. 저장소 카탈로그, 배포 현황·이력, 배포 흐름 도식, 구성도·연관 관계, 러너, 시크릿, APK 보관함 등을 GitHub API 로 읽는다. GitHub 계정으로 로그인한다(허용 명단에 있는 계정만).
-
-> 지금은 사내 Gitea 기반 콘솔에서 GitHub 기반으로 옮기는 중이다. 아래 "옮기는 중" 표를 보고 작업한다.
+[RosieOh](https://github.com/RosieOh) 의 GitHub 저장소를 한곳에서 보는 개인 콘솔. 저장소 카탈로그, 배포 현황·이력, 배포 흐름 도식, 구성도·연관 관계, 러너, 시크릿, 서버 점검, APK 보관함, 업무보드·주간보고를 GitHub API 로 다룬다. 콘솔 계정(아이디·비밀번호) 또는 GitHub 계정으로 로그인한다(가입은 관리자 승인 뒤).
 
 ## 메뉴
-- **개요**: 카탈로그 트리(그룹 › 프로젝트 › 구성요소), 구성요소별 테스트배드·운영 헬스
-- **배포**: 현황(AG Grid) · 이력 · 되돌리기 · 운영 반영(예약). 실행 기록은 GitHub Actions, 버전은 로그의 Kamal 컨테이너 이름(`<서비스>-web-<환경>-<버전>`)에서
+- **개요**: 카탈로그 트리(그룹 › 프로젝트 › 구성요소), 구성요소별 테스트배드·운영 헬스, 확인이 필요한 것
+- **배포**: 현황 · 이력 · 되돌리기 · 운영 반영(예약)
+  - Kamal 배포: GitHub Actions 실행 로그의 컨테이너 이름(`<서비스>-web-<환경>-<버전>`)에서 버전
+  - GitHub Pages·Vercel: GitHub Deployments 환경(`github-pages`·`Production`)의 배포 기록에서 버전(커밋 12자)
 - **배포 흐름**: 서비스 → GitHub(Actions) → 러너 → 산출물 → 대상 → 사람 → 데이터를 한 장에. 실행 중인 배포는 단계마다 움직인다
 - **기능 스위치**: 서비스의 `/api/console/flags` 를 켜고 끈다(`api/src/flags/targets.ts`)
 - **APK**: 기기앱 APK 를 GitHub 릴리스에서 중계(로그인 없이 `/apk`, IP 당 분당 30회)
-- **서버**: 각 저장소의 `probe.yml` 이 보낸 점검 결과(`/dashapi/probe/ingest`, `PROBE_TOKEN`)
+- **서버**: 서버를 맡은 저장소의 `probe.yml`(재사용 워크플로 `server-probe.yml`)이 15분마다 보내는 부하·메모리·디스크·컨테이너, 로그 끝·다시 시작
 - **러너**: 셀프 호스티드 러너(저장소별)와 워크플로의 `runs-on`. 호스티드 러너(`ubuntu-latest` 등)는 경고에서 뺀다
-- **시크릿**: 저장소 시크릿·변수 이름과 쓰는 곳. 변수는 만들기·바꾸기·지우기, 시크릿 값 쓰기는 아직 안 됨(아래)
+- **시크릿**: 저장소 시크릿·변수 이름과 쓰는 곳. 시크릿 값은 저장소 공개키로 봉인(libsodium sealed box)해서 쓴다
 - **구성도**: 같은 전체 도식 · 연관 관계(설정 파일의 키 이름·호스트로 자동 수집 → 확정·거절) · DB 스키마
-- **업무**: 보드·주간보고 화면만 남아 있다(서버는 다시 만들 예정)
+- **업무**: 보드(따라가는 저장소의 이슈 칸반 — `단계/<이름>` 라벨 또는 기록으로 단계) · 주간보고(자동 초안·저장·확정)
 - **개발**: API 문서(테스트배드 OpenAPI) · Tools(테스트 JWT·API 테스터) · 도구(`api/src/tools/catalog.ts` 에 적은 저장소)
-- **설정**(관리자): 서비스 카탈로그 · 권한(로그인할 GitHub 계정과 역할) · 빌드 알림
+- **설정**(관리자): 서비스 카탈로그 · 회원(가입 승인·정지·임시 비밀번호) · 권한(역할) · 빌드 알림
+- **마이페이지**(사용자 메뉴): 프로필, 비밀번호, GitHub 연결, 다른 기기 로그아웃, 로그인 기록, 탈퇴
 
-## 옮기는 중
+## 현황
 
 | 영역 | 상태 |
 |---|---|
-| 로그인 | GitHub OAuth. `CONSOLE_ADMINS` + 권한 화면에 추가한 계정만 |
-| 카탈로그 | RosieOh 저장소 84개(포크·프로필 제외) + 조직 MarioChunjaeIT 6개를 8개 그룹으로 `api/src/catalog/defaults.ts` 에. 공개 사이트가 있는 것(대동여지도·RosieTechBlog)만 운영 헬스. 배포 트랙은 아직 없음 |
-| 조직 | `GITHUB_ORGS` 의 조직 저장소를 저장소 고르기·러너·시크릿·배포 등에서 함께 다룬다. 콘솔 안의 저장소 이름은 `<조직>/<저장소>`(주인 저장소는 이름만) |
+| 로그인·회원 | 콘솔 계정(scrypt) + GitHub OAuth. 가입·처음 보는 GitHub 로그인은 승인 대기 → 승인 시 보기 권한. 처음 관리자 `CONSOLE_ADMINS`, 비밀번호는 `scripts/set-password.bash` 로도 |
+| 카탈로그 | RosieOh 저장소 84개 + 조직 MarioChunjaeIT 6개를 8개 그룹으로(`api/src/catalog/defaults.ts`). 종류: 백엔드·웹·기기앱·스토어 앱·데스크톱 앱·도구·노트북 |
+| 배포 | 배포 기록이 있는 7개(대동여지도·BetweenTheLines·차곡·otel-canary·hoonShop·LeeEung — Pages, RosieTechBlog — Vercel)에 운영 헬스·배포 트랙. 서버 배포가 생기면 Kamal 트랙이나 환경 이름을 `LIVE` 에 |
+| 조직 | `GITHUB_ORGS` 의 조직 저장소를 함께 다룬다. 콘솔 안의 저장소 이름은 `<조직>/<저장소>`(주인 저장소는 이름만) |
 | 저장 | `DATABASE_URL` 이 있으면 MariaDB, 없으면 파일. 콘솔은 한 대만 띄운다고 본다 |
-| 배포·흐름·운영 반영 | GitHub Actions API 로 옮김. 카탈로그에 배포 트랙을 적어야 나온다 |
-| 러너 | 저장소별 셀프 호스티드 러너 + 최근 push 한 저장소 10개의 최근 실행 5개씩의 작업 |
-| 시크릿 | 목록·사용처·변수 쓰기는 됨. **시크릿 값 쓰기는 저장소 공개키 봉인(libsodium sealed box)이 필요해 꺼 둠** |
-| APK | GitHub 릴리스(프리릴리스 = 내부 테스트). 다운로드는 릴리스 asset API 로 |
-| 서버 | 점검 대상 서버 없음(`api/src/infra/defaults.ts`). probe 워크플로는 새로 만들어야 한다 |
-| 업무보드 | 서버(board-core) 제거. `/board/api/*` 는 503. GitHub Issues·Projects 로 다시 만들 자리 |
-| 인프라·배치 | `DEFAULT_INFRA` 는 GitHub·GHCR·Releases·Pages 만. `PLACEMENT`(구성요소 → 러너·산출물·대상) 비어 있음 |
+| 서버 점검 | 재사용 워크플로와 등록 스크립트(`scripts/new-server.bash`)는 있고, 등록된 서버는 아직 없다 |
+| 업무보드 | GitHub Issues·PR 기반. 쓰기(단계 옮기기·막힘·닫기)는 `GITHUB_WRITE_TOKEN` 이 있어야 — 없으면 읽기 전용 |
+| 배포 | CI(PR 검사)·GHCR 이미지·운영 compose 예시는 있다. 띄울 곳·도메인은 [#5](https://github.com/RosieOh/RosieOhConsole/issues/5) |
 
 ## 기술
-- **web**: React 19 · Vite 8 · TypeScript 7. 업무보드 화면도 여기(`web/src/board/`) — 한 SPA, 한 빌드
-- **api**: NestJS 12 (ESM) · Express 5 · Node 22 — `/dashapi/*` + 화면 정적 서빙(단일 컨테이너)
+- **web**: React 19 · Vite 8 · TypeScript 7 · three.js(로그인 화면만, 동적 로딩). 업무보드 화면도 여기(`web/src/board/`) — 한 SPA, 한 빌드
+- **api**: NestJS 12 (ESM) · Express 5 · Node 22 — `/dashapi/*` + `/board/api/*` + 화면 정적 서빙(단일 컨테이너)
 - 저장(`api/src/persist.ts`): `DATABASE_URL` 이 있으면 **MariaDB**, 없으면 `DATA_DIR`(기본 `/data`)의 JSON 파일(로컬 개발·시험)
-  - `store(name, rev, value)` — 문서 하나가 한 줄: `catalog` · `access` · `schedules` · `relations` · `deploy-readings` …(파일 모드의 `<name>.json` 과 같은 이름)
+  - `store(name, rev, value)` — 문서 하나가 한 줄: `catalog` · `access` · `accounts` · `board` · `schedules` · `relations` · `deploy-readings` …(파일 모드의 `<name>.json` 과 같은 이름)
   - `audit` — 감사 로그, `blob_file` — 로고 그림
   - 표는 시작할 때 스스로 만든다. 문서는 시작할 때 메모리로 읽고, 쓰기는 메모리 → DB 차례로. DB 에 없고 `DATA_DIR` 에 옛 파일이 있으면 처음 한 번 옮겨 온다
-- GitHub 호출은 `api/src/github.ts`(`ghFetch`·`ghJson`·`ghRaw`·`ghPaged`·`ownerRepos`) 한 곳으로
+- GitHub 호출은 `api/src/github.ts`(`ghFetch`·`ghJson`·`ghRaw`·`ghPaged`·`ghGraphql`·`ownerRepos`) 한 곳으로
 
 ## 환경변수
-`.env.example` 참고. 꼭 필요한 것은 `OAUTH_CLIENT_ID`·`OAUTH_CLIENT_SECRET`(GitHub OAuth 앱, 콜백 `<PUBLIC_URL>/dashapi/oauth/callback`) · `SESSION_SECRET`(32자 이상). `GITHUB_TOKEN` 이 없으면 공개 API 한도(시간당 60회)로 돈다.
+`.env.example` 참고. 꼭 필요한 것은 `OAUTH_CLIENT_ID`·`OAUTH_CLIENT_SECRET`(GitHub OAuth 앱, 콜백 `<PUBLIC_URL>/dashapi/oauth/callback`) · `SESSION_SECRET`(32자 이상). `GITHUB_TOKEN` 이 없으면 공개 API 한도(시간당 60회)로 돌고 업무보드(GraphQL)는 읽지 못한다. 쓰기(되돌리기·운영 반영·시크릿·업무보드 옮기기·서버 점검 요청)는 `GITHUB_WRITE_TOKEN`.
 
 ## 로컬 개발
 ```
-cd api && npm ci && npm run build && npm test
-OAUTH_CLIENT_ID=… OAUTH_CLIENT_SECRET=… SESSION_SECRET=$(openssl rand -hex 32) \
-  GITHUB_TOKEN=… DATA_DIR=./data PUBLIC_URL=http://localhost:8087 node dist/main.js
-cd web && npm ci && npm run dev        # Vite (/dashapi·/mxtest·/board/api → 8087)
+scripts/setup-env.bash          # .env 만들기(SESSION_SECRET 생성)
+scripts/set-password.bash rosieoh   # 처음 관리자 비밀번호(GitHub 로그인 전에도 들어오게)
+scripts/dev.bash                # api(8087) + web(5173) — 화면은 http://localhost:5173
+scripts/dev.bash --mock         # 토큰 없이 가짜 API 로 화면만
+scripts/check.bash              # 커밋 전 검사(api 빌드·시험, web 타입 검사·시험)
 ```
+`dev.bash` 는 화면을 같이 띄우면 `PUBLIC_URL` 을 `http://localhost:5173` 으로 쓴다 — GitHub OAuth 앱 콜백에 `http://localhost:5173/dashapi/oauth/callback` 을 넣는다.
 
 MariaDB 로 띄우려면(이 컴퓨터에 MariaDB 가 3306 을 쓰고 있어도 겹치지 않게 3307):
 ```
 docker compose up -d mariadb
-DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console … node dist/main.js
-TEST_DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console npm test   # MariaDB 시험까지
+DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console   # .env 에
+TEST_DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console npm --prefix api test   # MariaDB 시험까지
 ```
 
-토큰 없이 화면만 보려면 가짜 API 를 쓴다. 모르는 경로는 404 와 함께 터미널에 찍히니, 화면이 비면 거기 보고 `ROUTES` 에 추가한다.
-```
-cd web && node dev/mock-api.mjs        # 8087
-cd web && npm run dev                  # 다른 터미널
-```
+만들기 스크립트(`scripts/README.md`): `new-feature`·`new-api`·`new-page`(기능 한 벌), `new-app`(카탈로그 항목), `new-server`(점검할 서버), `db-backup`.
 
 ## 배포
-아직 정하지 않았다. `Dockerfile` 은 web·api 빌드와 시험을 거쳐 한 이미지(포트 8087)를 만든다. `docker compose up -d --build` 는 MariaDB 와 콘솔을 함께 띄운다(`.env` 필요).
+- PR·main 마다 CI(`.github/workflows/ci.yml`) — api 빌드·시험(MariaDB 포함), web 타입 검사·시험·빌드
+- main 머지마다 이미지(`.github/workflows/image.yml`) → `ghcr.io/rosieoh/rosieohconsole:<커밋 12자>`, `:latest`
+- 운영 실행 예시: `deploy/compose.prod.yml`(GHCR 이미지 + MariaDB + Caddy 자동 HTTPS) + `deploy/Caddyfile`, 백업 `scripts/db-backup.bash --prod`
+- 띄울 곳·도메인·OAuth 운영 콜백은 [#5](https://github.com/RosieOh/RosieOhConsole/issues/5)
