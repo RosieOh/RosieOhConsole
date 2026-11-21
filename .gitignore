@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+_img/
+*.tar
+*.tar.gz
+.DS_Store
+api/docs/*.md.bak
+
+.env
+.env.*
+!.env.example
+data/
+web/tsconfig.tsbuildinfo
+api/public/

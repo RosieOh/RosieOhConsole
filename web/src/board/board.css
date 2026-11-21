@@ -1,0 +1,1385 @@
+/* 업무보드(#148) — 콘솔 안으로 들어온 보드의 스타일.
+
+   보드는 원래 Tailwind 로, 콘솔은 손으로 쓴 CSS 로 돼 있었다. 한 문서에서 두
+   체계가 같이 돌면 어느 쪽이 이기는지가 레이어·명시도·!important 에 따라 달라져
+   사람이 못 쫓아간다 — 이번 작업에서 생긴 버그가 거의 다 그 접점에서 나왔다
+   (.grid 이름 충돌, 콘솔의 전역 input 규칙, 레이어 순서가 뒤집혀 숨을 것이 안
+   숨던 일). 그래서 className 193군데를 전부 의미 이름으로 다시 쓰고 모양을 이
+   파일로 옮겼다. Tailwind 는 빌드에서 걷어냈다.
+
+   이름은 .board-* 로 묶어 콘솔과 겹치지 않게 한다. 색·여백·모서리는 콘솔
+   변수(--text, --panel, --border, --p-*, --r-md…)를 그대로 쓴다 — 두 화면이
+   같은 팔레트를 보도록. 덤으로 보드가 밝은 테마도 갖게 됐다(원래는 다크 전용).
+
+   @layer base 는 남아 있다. preflight 가 없으니 .board-scope 안의 button·input
+   이 브라우저 기본값을 쓰는데(단추마다 회색 테두리, search 가 padding 무시),
+   그 리셋은 다른 모든 규칙보다 약해야 한다 — 레이어 안은 늘 레이어 밖에 진다. */
+
+/* 가감속 — 두 곡선뿐이라 따로 둔다 */
+:root {
+  --ease-out-soft: cubic-bezier(.16, 1, .3, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* 단계 9색 — 파이프라인 순서를 색으로 읽게 한 의미 색이다(회색→노랑→파랑→청록→
+   주황→초록→보라). 색상 순서는 지키고 채도만 바다 쪽으로 당긴다. 콘솔이 파스텔
+   6색에 한 처방과 같다.
+   ⚠ 상수 hex 로는 두 테마를 못 담아서 CSS 변수로 뺐다 — lib/stages.ts 의
+   colorOf 가 이 값을 읽고, 입자 캔버스도 그 값으로 그린다. */
+/* 떠 있는 면 — 막(scrim)과 창(pop). 콘솔의 .modal-back·.picker-pop 과 같은 값.
+   보드는 이 둘을 박힌 색으로 들고 있어서 밝은 테마에서 검은 판이 떴다. */
+:root {
+  --scrim: rgba(186, 214, 230, 0.38);
+  --pop: rgba(255, 255, 255, 0.92);
+}
+:root[data-theme="dark"] {
+  --scrim: rgba(5, 12, 22, 0.52);
+  --pop: rgba(20, 44, 60, 0.94);
+}
+
+:root {
+  --stage-intake: #6d8a9a;          --stage-planned: #8ba7b6;
+  --stage-started: #b8801f;         --stage-review: #1b559a;
+  --stage-ready_to_merge: #0f6a64;  --stage-awaiting_deploy: #a85a1a;
+  --stage-deployed: #27654b;        --stage-done: #434ca6;
+  --stage-cancelled: #9ab1be;       --stage-unstaged: #ab3450;
+}
+:root[data-theme="dark"] {
+  --stage-intake: #7fa6bf;          --stage-planned: #a7c6d8;
+  --stage-started: #ffd05c;         --stage-review: #8fd2ff;
+  --stage-ready_to_merge: #6ff0ea;  --stage-awaiting_deploy: #ffb066;
+  --stage-deployed: #3df5b0;        --stage-done: #b78cff;
+  --stage-cancelled: #5b7d95;       --stage-unstaged: #ff5d8f;
+}
+
+/* ══ 폼 요소 리셋 ══ preflight 를 뺀 대가다. 통짜 @import 를 안 쓰니
+   button·input·select 가 브라우저 기본값을 그대로 쓴다 — 단추마다 회색 테두리가
+   그려지고, input[type=search] 는 기본 appearance 라 padding 을 무시해서 돋보기
+   아이콘과 글자가 겹쳤다. 콘솔에는 button { font-family: inherit } 한 줄뿐이라
+   못 막는다.
+   ⚠ base 레이어에 넣는다. 레이어 밖에 두면 유틸(border-line-2 · bg-white/[.04])을
+   이겨서 테두리·바탕이 통째로 사라진다. 리셋은 유틸보다 약해야 한다.
+   ⚠ .board-scope 안으로만 — 콘솔 쪽 단추를 건드리면 안 된다. 떠 있는 것들(상세·
+   팔레트·모달)은 body 로 포털하므로 .board-pop 도 같이 본다. */
+@layer base {
+  .board-scope button, .board-pop button {
+    font: inherit; color: inherit; margin: 0; padding: 0;
+    background: none; border: 0; border-radius: 0; cursor: pointer;
+  }
+  .board-scope button:disabled, .board-pop button:disabled { cursor: not-allowed; }
+  .board-scope input, .board-scope select, .board-scope textarea,
+  .board-pop input, .board-pop select, .board-pop textarea {
+    font: inherit; color: inherit; margin: 0;
+    background: none; border: 0; border-radius: 0;
+    appearance: none; -webkit-appearance: none;
+  }
+  /* 돋보기 아이콘이 들어갈 자리를 비우려면 기본 검색창 모양을 꺼야 한다 */
+  .board-scope [type="search"], .board-pop [type="search"] { -webkit-appearance: none; outline-offset: -2px; }
+  .board-scope [type="search"]::-webkit-search-decoration,
+  .board-scope [type="search"]::-webkit-search-cancel-button,
+  .board-pop [type="search"]::-webkit-search-decoration,
+  .board-pop [type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+  /* 고르기에는 화살표를 직접 그린다(기본 모양을 껐으므로) */
+  .board-scope select, .board-pop select {
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: right 14px center, right 9px center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+  }
+}
+
+/* 문서 수준 규칙은 걷었다 — 콘솔 프레임과 싸운다.
+   뺀 것: html·body·#root 높이, body 바탕·글꼴·overflow:hidden,
+   body::before 오로라(콘솔엔 WebGL 바다가 이미 있다), ::selection,
+   :focus-visible, 스크롤 막대. 집는 동안의 커서만 남긴다. */
+body.grabbing, body.grabbing * { cursor: grabbing !important; }
+
+/* 레이어 안에 둔다 — 콘솔의 같은 이름 규칙(.btn 등)에 양보하기 위해서다 */
+@layer components {
+  /* 설명 풍선 — 올리거나 초점이 가면 바로 뜬다 */
+  [data-tip] { position: relative; }
+  /* ⚠ font 단축 속성에 family 로 inherit 을 쓸 수 없다 — 선언 전체가 무시돼서
+     글꼴이 깨진다. 낱개 속성으로 쓴다. 바탕도 보드의 옛 색(rgb(35 36 51))이
+     박혀 있어서 밝은 테마에서 검은 상자에 검은 글자가 됐다(#148). */
+  [data-tip]:hover::after, [data-tip]:focus-visible::after {
+    content: attr(data-tip); position: absolute; z-index: 300; top: calc(100% + 8px); right: 0;
+    width: max-content; max-width: 250px; white-space: normal; text-align: left;
+    padding: 8px 11px; border-radius: 10px; border: none;
+    background: var(--pop); color: var(--text);
+    font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.5;
+    backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.62),
+      0 18px 40px -16px rgba(var(--cast), 0.42),
+      0 4px 12px -6px rgba(var(--cast), 0.22);
+    pointer-events: none; animation: tip-in 160ms var(--ease-out-soft) both;
+  }
+  :root[data-theme="dark"] [data-tip]:hover::after,
+  :root[data-theme="dark"] [data-tip]:focus-visible::after {
+    box-shadow:
+      inset 0 1px 0 rgba(170, 215, 240, 0.16),
+      0 18px 40px -16px rgba(0, 0, 0, 0.7);
+  }
+  /* 사이드바는 overflow:auto 라 말풍선이 밖으로 못 나간다 — 폭을 사이드바에
+     맞춰 접히게 한다(안 그러면 오른쪽이 잘린다, #148) */
+  .side [data-tip]:hover::after, .side [data-tip]:focus-visible::after {
+    left: 0; right: 0; width: auto; max-width: none;
+  }
+
+  /* 단계 링 — 첫 화면에 칸 제목 링이 차례로 차오르고, 카드가 새 칸에 내려앉을 때 다시 차오른다 */
+  .stage-ring .pie { transition: stroke-dashoffset 700ms var(--ease-out-soft); }
+  .boot .col-head .stage-ring { animation: ring-pop 700ms var(--ease-spring) both; animation-delay: calc(var(--i) * 70ms + 120ms); }
+  .boot .col-head .stage-ring .pie, .landed .stage-ring .pie { animation: ring-fill 900ms var(--ease-out-soft) both; }
+  .boot .col-head .stage-ring .pie { animation-delay: calc(var(--i) * 70ms + 260ms); }
+
+  .landed { animation: land 800ms var(--ease-spring) both; }
+
+  /* 불러오는 동안의 뼈대 */
+  .skel { border-radius: 7px; background: linear-gradient(90deg, rgb(222 226 255 / .05) 25%, rgb(222 226 255 / .11) 45%, rgb(222 226 255 / .05) 65%);
+    background-size: 300% 100%; animation: shimmer 1.3s linear infinite; }
+
+  /* 카드 딱지(지연·정체·CI 실패·사람이 정함) — 콘솔에도 .chip 이 있고 그쪽은
+     레이어 밖이라 늘 이긴다. 이름을 갈라 둔다(#148). 재질(유리)은 아래에서 얹는다. */
+  .board-chip {
+    font-size: 11px; line-height: 1.6; padding: 0 7px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted);
+    background: rgba(255, 255, 255, 0.03); white-space: nowrap;
+  }
+  .board-chip-w { color: var(--amber); }
+  .board-chip-d { color: var(--red); }
+  .board-chip-b { color: var(--accent); }
+
+  /* 도구 줄 단추 — 확인 필요만 · ⌘K */
+  .tbtn {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: none;
+    padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03); color: var(--text-2);
+    transition: border-color .15s, color .15s, background-color .15s, transform .1s;
+  }
+  .tbtn:hover { border-color: var(--border-2); color: var(--text); }
+  .tbtn:active { transform: scale(.97); }
+  .tbtn[aria-pressed="true"] {
+    border-color: color-mix(in srgb, var(--red) 50%, transparent);
+    color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent);
+  }
+
+  .board-scope kbd {
+    font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--muted);
+    border: 1px solid var(--border-2); border-bottom-width: 2px;
+    border-radius: 5px; padding: 0 5px; background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+@keyframes tip-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes ring-fill { from { stroke-dashoffset: var(--full); } }
+@keyframes ring-pop { from { transform: scale(.4); opacity: 0; } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes land {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 70%, transparent), 0 10px 30px -8px color-mix(in srgb, var(--c) 60%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent, 0 1px 2px rgb(0 0 0 / .35); }
+}
+
+/* 보드가 뜰 때의 본문 — 콘솔의 다른 화면은 여백을 두고 세로로 스크롤되지만,
+   칸반은 가장자리까지 꽉 차고 스크롤은 칸 안에서 일어나야 한다.
+   .fr-main 의 padding(26 30 110)과 overflow:auto 를 이 화면에서만 걷는다(#148). */
+.fr-main.fr-main-flush { padding: 0; overflow: hidden; }
+.fr-main.fr-main-flush > div { min-height: 0; height: 100%; }
+
+/* 보드 페이지 — 콘솔 프레임 안에서는 화면 전체가 아니라 주어진 상자를 채운다.
+   보드는 원래 body 가 overflow:hidden 인 전체 화면을 전제로 짜였다. */
+.board-scope {
+  position: relative;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  /* 행을 못 박는다 — 암시적 행은 내용 높이로 잡혀서 사이드바가 바닥까지 안 간다 */
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: -.005em;
+}
+@media (max-width: 900px) { .board-scope { grid-template-columns: minmax(0, 1fr); } }
+
+/* ══ 유리 ══ 칸과 카드에 콘솔과 같은 재질을 입힌다(#148).
+   콘솔의 처방 그대로 — ① 투과(알파를 내리고 서리를 세게) ② 가장자리 두께(선이
+   아니라 안으로 번지는 띠) ③ 윗면 스페큘러 ④ 떠 있는 그림자.
+   ⚠ 서리(backdrop-filter)는 칸에만 건다. 콘솔의 규칙과 같은 이유로 — 카드까지
+   걸면 칸 안을 스크롤할 때 매 프레임 다시 합성해서 버벅인다. */
+.board-col {
+  /* 밝은 테마에서는 면도 묽게 — 뒤의 바다가 칸을 통과해야 유리판으로 읽힌다.
+     (다크는 바탕이 어두워서 이미 통과해 보인다 — 아래 다크 규칙에서 안 건드린다) */
+  background-color: rgba(255, 255, 255, 0.16);
+  /* ⚠ border-color: transparent 로는 모자라다. 폭이 1px 남아 있으면 backdrop-filter
+     와 만나 합성 이음매가 생긴다 — 밝은 쪽은 경계가 안쪽보다 밝고(243 vs 239)
+     어두운 쪽은 더 어둡다(23,40,64 vs 30,50,74). 폭을 0 으로 지워야 사라진다. */
+  border: 0 !important;
+  border-radius: var(--r-md, 16px);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  /* 얇은 판으로 — 면을 묽게, 띠를 얕게, 그림자를 바짝 붙인다. 두꺼워 보이는 건
+     깊은 띠와 멀리 떨어진 그림자가 만든다. 카드가 이 위에 떠 있어야 한다.
+     단계색은 선이 아니라 안으로 번지는 띠와 바깥 번짐으로 낸다. */
+  background-image: linear-gradient(166deg,
+    rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 28%,
+    rgba(255, 255, 255, 0) 56%, rgba(255, 255, 255, 0.06) 100%);
+  box-shadow:
+    inset 0 14px 20px -18px rgba(255, 255, 255, 0.50),
+    inset 0 -16px 22px -20px rgba(255, 255, 255, 0.44),
+    inset 0 14px 22px -16px color-mix(in srgb, var(--c) 34%, transparent),
+    inset 0 -12px 20px -20px color-mix(in srgb, var(--c) 22%, transparent),
+    0 1px 2px rgba(var(--cast), 0.10),
+    0 3px 10px -5px rgba(var(--cast), 0.14),
+    0 0 18px -9px color-mix(in srgb, var(--c) 42%, transparent);
+}
+/* 다크에서는 칸의 가장자리와 바깥 번짐이 단계색을 머금는다 — 띠 하나보다
+   이쪽이 유리답고, 칸을 멀리서 봐도 단계가 읽힌다. 시안(기본 유리색) 대신
+   --c 를 쓰되 알파를 낮춰 색면이 되지 않게. */
+:root[data-theme="dark"] .board-col {
+  background-image: linear-gradient(166deg,
+    color-mix(in srgb, var(--c) 9%, transparent) 0%,
+    color-mix(in srgb, var(--c) 3%, transparent) 30%,
+    rgba(120, 230, 255, 0.008) 58%,
+    color-mix(in srgb, var(--c) 5%, transparent) 100%);
+  box-shadow:
+    inset 0 16px 24px -18px color-mix(in srgb, var(--c) 38%, transparent),
+    inset 0 -16px 24px -22px color-mix(in srgb, var(--c) 32%, transparent),
+    0 0 20px -9px color-mix(in srgb, var(--c) 42%, transparent),
+    0 6px 18px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* 카드 — 칸(반투명) 위에 또 한 겹이라 콘솔 카드보다 묽어야 탁해지지 않는다.
+   서리는 걸지 않는다. 콘솔의 규칙과 같은 이유로 — 칸 안을 스크롤할 때 매 프레임
+   다시 합성한다. 형태는 윗면 빛 한 줄과 가라앉는 그림자로만 낸다. */
+.board-card {
+  border: none;
+  border-radius: var(--r-md, 16px);
+  background: var(--panel-2);
+  /* ③ 윗면 스페큘러 — 흰 광을 흰 면에 얹으면 안 보인다. 위는 더 희게, 아래는
+     차가운 쪽(회청)으로 떨어뜨린다. 그 차이가 곡면을 만든다. */
+  background-image: linear-gradient(166deg,
+    rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.46) 26%,
+    rgba(226, 240, 249, 0.26) 58%, rgba(206, 230, 244, 0.34) 100%);
+  /* ② 가장자리 두께 — 사방에 균일한 선을 그으면 '테두리 그린 상자'가 된다.
+        위·아래만 밝히고 옆은 죽여야 곡면으로 읽힌다(콘솔 카드와 같은 처방).
+     ④ 떠 있는 그림자 — 얕게·중간·깊게 세 겹. 한 겹은 떠오르지 않는다. */
+  /* ⚠ 선은 하나도 긋지 않는다. 음수 spread 를 blur 만큼 키우면 띠가 1~2px 선으로
+     뭉치고(네 방향이 모이면 테두리가 된다), inset 0 1px 1px 윗날도 결국 1px 선이다.
+     위·아래로 번지는 띠만 남긴다 — 빛이 위에서 들어와 아래로 사그라드는 모양. */
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.85),
+    /* 아래로 가라앉는 차가운 그늘 — 흰 띠만으로는 밝은 바탕에서 티가 안 난다 */
+    inset 0 -20px 28px -22px rgba(var(--cast), 0.26),
+    0 2px 5px -1px rgba(var(--cast), 0.12),
+    0 8px 16px -7px rgba(var(--cast), 0.16),
+    0 18px 32px -18px rgba(var(--cast), 0.20);
+  transition: box-shadow .18s, background-color .18s, transform .18s;
+}
+.board-cardwrap:hover > .board-card {
+  background-color: var(--hover);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.95),
+    inset 0 -20px 28px -22px rgba(var(--cast), 0.30),
+    0 2px 6px -1px rgba(var(--cast), 0.16),
+    0 12px 22px -8px rgba(var(--cast), 0.22),
+    0 26px 44px -20px rgba(var(--cast), 0.26);
+}
+:root[data-theme="dark"] .board-card {
+  background: rgba(150, 215, 245, 0.055);
+  border-radius: var(--r-md, 16px);
+  background-image: linear-gradient(166deg,
+    rgba(120, 230, 255, 0.13) 0%, rgba(120, 230, 255, 0.04) 28%,
+    rgba(120, 230, 255, 0.01) 58%, rgba(120, 230, 255, 0.08) 100%);
+  box-shadow:
+    inset 0 20px 28px -22px rgba(120, 230, 255, 0.34),
+    inset 0 -22px 30px -24px rgba(120, 230, 255, 0.40),
+    0 10px 24px -14px rgba(0, 0, 0, 0.62);
+}
+:root[data-theme="dark"] .board-cardwrap:hover > .board-card {
+  background-color: rgba(150, 215, 245, 0.11);
+  box-shadow:
+    inset 0 1px 0 rgba(190, 245, 255, 0.34),
+    inset 0 0 0 1px rgba(120, 230, 255, 0.20),
+    0 0 20px -8px rgba(var(--cast), 0.40),
+    0 12px 26px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* 확인 필요 — 콘솔은 왼쪽 띠를 쓰지 않는다. .scard.bad 처럼 가장자리에 빨강을
+   섞고(color-mix), .qcard.pink 처럼 면을 옅게 물들인다. 같은 말투로 맞춘다. */
+/* 콘솔은 '주의' 를 파스텔 면(--p-pink)으로 알린다. 가장자리에 진한 선을 긋지
+   않는다 — 밝은 바탕에서 색 선은 때처럼 보인다. 그림자만 분홍으로 물들인다. */
+.board-card-risk {
+  background-color: var(--p-pink) !important;
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.52),
+    inset 0 -22px 30px -24px rgba(255, 255, 255, 0.48),
+    0 2px 5px -1px rgba(205, 60, 85, 0.14),
+    0 8px 16px -7px rgba(205, 60, 85, 0.18),
+    0 18px 32px -18px rgba(205, 60, 85, 0.22) !important;
+}
+.board-cardwrap:hover > .board-card-risk {
+  background-color: color-mix(in srgb, var(--p-pink) 78%, #ffffff) !important;
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.64),
+    inset 0 -22px 30px -24px rgba(255, 255, 255, 0.58),
+    0 2px 6px -1px rgba(205, 60, 85, 0.18),
+    0 12px 22px -8px rgba(205, 60, 85, 0.24),
+    0 26px 44px -20px rgba(205, 60, 85, 0.26) !important;
+}
+:root[data-theme="dark"] .board-card-risk {
+  background-color: color-mix(in srgb, var(--red) 13%, transparent);
+  /* 빨간 면에 시안 띠를 얹으면 묻힌다 — 제 색으로 빛나게 */
+  background-image: linear-gradient(166deg,
+    color-mix(in srgb, var(--red) 26%, transparent) 0%,
+    color-mix(in srgb, var(--red) 9%, transparent) 28%,
+    transparent 58%,
+    color-mix(in srgb, var(--red) 14%, transparent) 100%) !important;
+  box-shadow:
+    inset 0 20px 28px -22px color-mix(in srgb, #ffd9e6 70%, transparent),
+    inset 0 -22px 30px -24px color-mix(in srgb, var(--red) 70%, transparent),
+    0 0 20px -9px color-mix(in srgb, var(--red) 52%, transparent),
+    0 10px 24px -14px rgba(0, 0, 0, 0.62) !important;
+}
+:root[data-theme="dark"] .board-cardwrap:hover > .board-card-risk {
+  background-color: color-mix(in srgb, var(--red) 18%, transparent);
+  box-shadow:
+    inset 0 20px 28px -22px color-mix(in srgb, #ffd9e6 90%, transparent),
+    inset 0 -22px 30px -24px color-mix(in srgb, var(--red) 85%, transparent),
+    0 0 28px -8px color-mix(in srgb, var(--red) 62%, transparent),
+    0 14px 30px -14px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* 끌고 다니는 유령 카드 — 단계 색으로 떠오른다 */
+.board-card-ghost {
+  background: var(--panel-solid) !important;
+  background-image: none !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent),
+    0 0 44px -8px color-mix(in srgb, var(--c) 60%, transparent),
+    0 28px 60px -14px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* ══ 사이드바 ══ 콘솔 레일(.fr-rail) 바로 옆에 선다. 레일은 수수하다 —
+   --panel 바탕에 오른쪽 선 하나뿐이고 광도 그림자도 없다. 여기에만 유리를
+   얹으면 둘이 따로 놀아서 왼쪽이 두 겹으로 보인다. 레일과 같은 재질로 둔다.
+   (칸·카드는 캔버스 위에 떠 있는 것이라 유리가 맞다 — 여기는 셸이다.) */
+.board-side {
+  background: var(--panel);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  border-right: 1px solid var(--border);
+}
+
+/* 보기·담당 단추 — 흰 알파 사각형이었다. 콘솔의 알약 말투로. */
+.board-navbtn {
+  border-radius: 10px;
+  color: var(--text-2);
+  background: transparent;
+  transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.board-navbtn:hover { color: var(--text); background: var(--hover); }
+.board-navbtn-ic { color: var(--muted); transition: color .15s; }
+.board-navbtn:hover .board-navbtn-ic { color: var(--text-2); }
+/* 고른 것 — 콘솔 알약과 같은 채움이되 한 단계 눅였다. 꽉 찬 바다색은 사이드바에
+   네 개씩 서면 너무 튄다. 개수 숫자(--muted-2)가 파란 바탕에서 안 읽히던 것도
+   같이 — 글자·아이콘·숫자를 한 묶음으로 흰색 계열에 둔다. */
+.board-navbtn.on {
+  background: linear-gradient(168deg,
+    color-mix(in srgb, var(--accent-fill-a, #5aa6d2) 88%, transparent) 0%,
+    color-mix(in srgb, var(--accent-fill-b, #215f8c) 92%, transparent) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 2px 6px -3px rgba(var(--cast), 0.34);
+}
+.board-navbtn.on, .board-navbtn.on .board-navbtn-ic { color: #ffffff; }
+.board-navbtn.on .board-navbtn-n { color: rgba(255, 255, 255, 0.78); }
+:root:not([data-theme="dark"]) .board-navbtn.on { text-shadow: 0 1px 2px rgba(10, 40, 62, 0.30); }
+:root[data-theme="dark"] .board-navbtn.on {
+  box-shadow: inset 0 1px 0 rgba(170, 245, 255, 0.26), 0 0 12px -4px rgba(79, 216, 255, 0.38);
+}
+
+/* 묶음을 가르는 선 — 흰 실선 대신 아주 옅게 */
+.board-sec { border-top: 1px solid var(--border); }
+
+/* ══ 폼 요소 ══ 콘솔의 전역 input·select·textarea 규칙은 레이어 밖이라(6군데)
+   Tailwind 유틸을 전부 이긴다 — 검색창의 w-60·pl-[30px] 가 무시되고 width:100% ·
+   padding:8px 11px 가 먹어서 돋보기와 글자가 겹쳤다. .board-scope 를 앞에 붙여
+   명시도로 되찾는다(0,1,1 > 0,0,1). 유틸이 아니라 여기서 모양을 정한다. */
+/* ⚠ !important 로 맞선다. 콘솔의 저 규칙들도 !important 라(유리 입력칸,
+   styles.css 2881줄) 명시도만으로는 못 이긴다. !important 끼리는 명시도로
+   갈리므로 .board-scope 를 앞에 붙이면(0,1,1 > 0,0,1) 이쪽이 이긴다. */
+.board-scope input, .board-scope select, .board-scope textarea,
+.board-pop input, .board-pop select, .board-pop textarea {
+  /* 폭은 각자 정한다 — 여기서 못 박으면 모달의 w-full 입력칸이 쪼그라든다 */
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+  font-family: inherit !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--panel-2) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+.board-scope input:focus, .board-scope select:focus, .board-scope textarea:focus,
+.board-pop input:focus, .board-pop select:focus, .board-pop textarea:focus {
+  outline: none; border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-soft) !important;
+  background: var(--panel-2) !important;
+}
+.board-scope textarea, .board-pop textarea { width: 100% !important; font-family: inherit !important; min-height: 120px !important; }
+
+/* 검색창 — 돋보기가 들어갈 자리를 왼쪽에 비운다 */
+.board-scope .board-search {
+  width: 240px !important; padding-left: 30px !important; padding-right: 10px !important;
+  transition: width .2s, border-color .2s;
+}
+.board-scope .board-search:focus { width: 300px !important; }
+@media (max-width: 900px) { .board-scope .board-search, .board-scope .board-search:focus { width: 100% !important; } }
+
+/* 저장소 고르기 — 기본 화살표를 껐으니 직접 그린다 */
+.board-scope .board-select {
+  width: 100% !important;
+  padding-right: 28px !important;
+  color: var(--text-2) !important;
+  background-color: var(--panel-2) !important;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%) !important;
+  background-position: right 14px center, right 9px center !important;
+  background-size: 5px 5px, 5px 5px !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 팔레트 입력칸 — 창 윗면에 얹히는 큰 글씨라 테두리 없이 */
+.board-pop .board-cmd-input {
+  width: 100% !important; padding: 15px 18px !important; font-size: 15px !important;
+  border: 0 !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important;
+  background: transparent !important;
+}
+.board-pop .board-cmd-input:focus { border-color: var(--border) !important; box-shadow: none !important; }
+
+/* ══ 확인 필요한 카드만 흔든다 ══ 콘솔이 .qcard.pink·.kpi.bad 에 쓰는 것과 같은
+   몸짓(jiggle, styles.css 에 정의돼 있다). 2.2초 동안 짧게 두 번 떨고 멈춘다.
+   칸이나 보드를 통째로 흔들지 않는다 — 어느 카드가 문제인지가 흐려진다. */
+.board-card-risk {
+  animation: jiggle 2.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+  will-change: transform;
+}
+/* 읽으려고 손을 올린 사람을 계속 흔들지 않는다 */
+.board-cardwrap:hover > .board-card-risk { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .board-card-risk { animation: none; }
+}
+
+/* ══ 입력칸·도구 단추도 유리 ══ 콘솔은 입력칸의 테두리를 지우고 유리로 바꿨다
+   ("밝은 바탕에서 회색 선은 때처럼 보인다"). 보드도 같은 말투로. */
+.board-scope input, .board-scope select, .board-scope textarea,
+.board-pop input, .board-pop select, .board-pop textarea {
+  border: none !important;
+  background-color: rgba(255, 255, 255, 0.34) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.86),
+    inset 0 -10px 16px -14px rgba(255, 255, 255, 0.82),
+    inset 10px 0 16px -20px rgba(255, 255, 255, 0.68),
+    inset -10px 0 16px -20px rgba(255, 255, 255, 0.68),
+    0 2px 7px -4px rgba(var(--cast), 0.18) !important;
+}
+.board-scope input:focus, .board-scope select:focus, .board-scope textarea:focus,
+.board-pop input:focus, .board-pop select:focus, .board-pop textarea:focus {
+  background-color: rgba(255, 255, 255, 0.56) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.92), 0 0 0 3px rgba(var(--cast), 0.14) !important;
+}
+:root[data-theme="dark"] .board-scope input, :root[data-theme="dark"] .board-scope select,
+:root[data-theme="dark"] .board-scope textarea, :root[data-theme="dark"] .board-pop input,
+:root[data-theme="dark"] .board-pop select, :root[data-theme="dark"] .board-pop textarea {
+  background-color: rgba(120, 230, 255, 0.07) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(190, 245, 255, 0.24),
+    inset 0 0 0 1px rgba(120, 230, 255, 0.12),
+    inset 0 -10px 16px -14px rgba(120, 230, 255, 0.24) !important;
+}
+:root[data-theme="dark"] .board-scope input:focus, :root[data-theme="dark"] .board-scope select:focus,
+:root[data-theme="dark"] .board-scope textarea:focus, :root[data-theme="dark"] .board-pop input:focus,
+:root[data-theme="dark"] .board-pop select:focus, :root[data-theme="dark"] .board-pop textarea:focus {
+  background-color: rgba(120, 230, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(190, 245, 255, 0.36),
+    inset 0 0 0 1px rgba(120, 230, 255, 0.28),
+    0 0 16px -4px rgba(79, 216, 255, 0.34) !important;
+}
+/* 팔레트 입력칸만 예외 — 창 윗면에 얹히는 큰 글씨라 면을 따로 그리지 않는다.
+   ⚠ :focus 까지 같이 적어야 한다. 팔레트는 열리자마자 초점이 가는데, 위의
+   …input:focus 규칙이 명시도로 더 세서(class 4 + element 1) 유리 면이 도로
+   깔렸다 — 창 안에 또 입력 상자가 든 것처럼 보였다(#148). */
+.board-pop .board-cmd-input, .board-pop .board-cmd-input:focus,
+:root[data-theme="dark"] .board-pop .board-cmd-input,
+:root[data-theme="dark"] .board-pop .board-cmd-input:focus {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* 도구 단추(확인 필요만 · ⌘K) — 선 대신 유리 */
+.board-scope .tbtn {
+  border: none !important;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.86),
+    inset 0 -10px 16px -14px rgba(255, 255, 255, 0.82),
+    0 2px 7px -4px rgba(var(--cast), 0.18);
+}
+.board-scope .tbtn:hover { background: rgba(255, 255, 255, 0.52); }
+:root[data-theme="dark"] .board-scope .tbtn {
+  background: rgba(120, 230, 255, 0.07);
+  box-shadow:
+    inset 0 1px 1px rgba(190, 245, 255, 0.24),
+    inset 0 0 0 1px rgba(120, 230, 255, 0.12);
+}
+:root[data-theme="dark"] .board-scope .tbtn:hover {
+  background: rgba(120, 230, 255, 0.13);
+  box-shadow: inset 0 1px 1px rgba(190, 245, 255, 0.34), 0 0 14px -5px rgba(79, 216, 255, 0.40);
+}
+/* 눌러 둔 상태(확인 필요만) — 납작한 분홍 면이었다. 콘솔 파스텔 칩과 같은
+   재질로 세운다: 면은 --p-pink, 글자는 제 잉크, 윗날 하나와 분홍 그림자(#148). */
+.board-scope .tbtn[aria-pressed="true"] {
+  background: var(--p-pink) !important;
+  color: var(--p-pink-ink) !important;
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -8px 12px -10px rgba(205, 60, 85, 0.30),
+    0 2px 8px -4px rgba(205, 60, 85, 0.36) !important;
+}
+:root[data-theme="dark"] .board-scope .tbtn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--red) 17%, transparent) !important;
+  color: var(--red) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 190, 215, 0.26),
+    inset 0 0 0 1px color-mix(in srgb, var(--red) 34%, transparent),
+    0 0 14px -5px color-mix(in srgb, var(--red) 60%, transparent) !important;
+}
+.board-scope .board-search { border-radius: 999px !important; }
+
+/* 글 속의 코드 조각(#번호 · closes #번호 · mx/issue-link) — 콘솔은 code 를
+   읽는 면으로 보고 불투명한 --panel-solid 로 칠한다(!important). 글 한가운데
+   박힌 조각에는 그게 어두운 덩어리로 보여서 다크에서 안 읽혔다. */
+.board-scope code, .board-pop code {
+  background: rgba(255, 255, 255, 0.52) !important;
+  /* ⚠ 흰 테두리는 흰 바탕에서 안 보인다 — 조각이 통째로 사라진다. 콘솔이 글
+     속 코드에 쓰는 것과 같은 회청색 고리를 두른다(#148). */
+  box-shadow: inset 0 0 0 1px rgba(122, 166, 190, 0.26) !important;
+  color: var(--text) !important;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.92em;
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+:root[data-theme="dark"] .board-scope code, :root[data-theme="dark"] .board-pop code {
+  background: rgba(120, 230, 255, 0.14) !important;
+  box-shadow: inset 0 0 0 1px rgba(120, 230, 255, 0.22) !important;
+  color: var(--accent) !important;
+}
+
+/* 고르기(Picker)는 콘솔 공용으로 올라갔다 — styles.css 의 .mx-pick* (#148) */
+
+
+/* ══ 도크 피하기 ══ 콘솔의 .fr-main 은 아래 여백 110px 으로 도크를 피하는데,
+   보드는 가장자리까지 꽉 차려고 그걸 걷었다(.fr-main-flush). 그래서 보드 안에서
+   따로 자리를 비운다. 도크는 bottom:16px 에 높이 50px 이다. */
+.board-cols { padding-bottom: 84px !important; }
+.board-report {
+  min-height: 0; flex: 1; overflow-y: auto;
+  padding: 18px 18px 96px;
+}
+
+/* ══ 상태 뱃지(주간보고) ══ 납작한 색면이던 것을 유리로. 콘솔의 .chip 말투. */
+.board-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 999px; white-space: nowrap; color: var(--text-2);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.40),
+    0 1px 3px -1px rgba(var(--cast), 0.16);
+}
+.board-badge-w  { color: var(--p-yellow-ink); background: var(--p-yellow); }
+.board-badge-ok { color: var(--p-lime-ink);   background: var(--p-lime); }
+.board-badge-d  { color: var(--p-pink-ink);   background: var(--p-pink); }
+:root[data-theme="dark"] .board-badge {
+  background: rgba(120, 230, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(190, 245, 255, 0.22), inset 0 0 0 1px rgba(120, 230, 255, 0.14);
+}
+:root[data-theme="dark"] .board-badge-w {
+  background: color-mix(in srgb, var(--amber) 15%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 170, 0.24),
+    inset 0 0 0 1px color-mix(in srgb, var(--amber) 30%, transparent),
+    0 0 12px -5px color-mix(in srgb, var(--amber) 55%, transparent);
+}
+:root[data-theme="dark"] .board-badge-ok {
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  box-shadow: inset 0 1px 0 rgba(180, 255, 225, 0.24),
+    inset 0 0 0 1px color-mix(in srgb, var(--green) 30%, transparent),
+    0 0 12px -5px color-mix(in srgb, var(--green) 55%, transparent);
+}
+:root[data-theme="dark"] .board-badge-d {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 190, 215, 0.24),
+    inset 0 0 0 1px color-mix(in srgb, var(--red) 32%, transparent),
+    0 0 12px -5px color-mix(in srgb, var(--red) 55%, transparent);
+}
+
+/* 보드 로고 — 납작한 색면이던 것을 유리로. 콘솔 도크 알약과 같은 말투. */
+.board-logo {
+  flex: none;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 16%, rgba(255, 255, 255, 0.42));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.46),
+    inset 0 -7px 11px -9px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 3px 9px -4px rgba(var(--cast), 0.30);
+}
+:root[data-theme="dark"] .board-logo {
+  background: rgba(120, 230, 255, 0.13);
+  box-shadow:
+    inset 0 1px 0 rgba(190, 245, 255, 0.40),
+    inset 0 0 0 1px rgba(120, 230, 255, 0.26),
+    inset 0 -7px 11px -9px rgba(120, 230, 255, 0.46),
+    0 0 14px -4px rgba(79, 216, 255, 0.45);
+}
+
+/* ══ 카드 딱지(지연·정체·CI 실패·사람이 정함) ══ 납작한 색면이던 것을 유리로.
+   @layer components 의 .board-chip 이 바탕·테두리를 깔고 있으므로 여기서 덮는다.
+   색(글자)은 .board-chip-w/-d/-b 가 정한 대로 두고 재질만 입힌다. */
+.board-scope .board-chip {
+  border: none !important;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 1px 3px -1px rgba(var(--cast), 0.14);
+}
+/* 색은 콘솔의 파스텔 칩에서 그대로 가져온다 — 면은 --p-*, 글자는 --p-*-ink.
+   색을 흰색에 조금만 섞으면 글자까지 묽어져서 밝은 바탕에서 안 읽힌다.
+   잉크가 따로 있는 이유가 그것이다. */
+.board-scope .board-chip-w { background: var(--p-yellow); color: var(--p-yellow-ink) !important; }
+.board-scope .board-chip-d { background: var(--p-pink);   color: var(--p-pink-ink) !important; }
+.board-scope .board-chip-b { background: var(--p-blue);   color: var(--p-blue-ink) !important; }
+/* 주의 카드 위에 얹히는 칩은 카드(--p-pink)와 같은 색이라 묻힌다 — 한 겹 더 진하게 */
+.board-card-risk .board-chip-d { background: color-mix(in srgb, var(--p-pink) 70%, var(--red)); }
+:root[data-theme="dark"] .board-scope .board-chip {
+  background: rgba(120, 230, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(190, 245, 255, 0.22), inset 0 0 0 1px rgba(120, 230, 255, 0.16);
+}
+:root[data-theme="dark"] .board-scope .board-chip-w {
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 170, 0.24),
+    inset 0 0 0 1px color-mix(in srgb, var(--amber) 32%, transparent),
+    0 0 10px -4px color-mix(in srgb, var(--amber) 55%, transparent);
+}
+:root[data-theme="dark"] .board-scope .board-chip-d {
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 190, 215, 0.24),
+    inset 0 0 0 1px color-mix(in srgb, var(--red) 32%, transparent),
+    0 0 10px -4px color-mix(in srgb, var(--red) 55%, transparent);
+}
+:root[data-theme="dark"] .board-scope .board-chip-b {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 1px 0 rgba(190, 245, 255, 0.26),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+    0 0 10px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* ══ 칸의 단계색 ══ 파이프라인을 색으로 읽게 한 의미색이라 확실히 보여야 한다.
+   위에 띠를 그리는 방법은 버렸다 — 둥근 모서리 밖으로 삐져나오고, 띠 하나는
+   유리 말투가 아니다. 밝은·어두운 양쪽 모두 가장자리 링과 바깥 번짐으로 낸다.
+   (아래 .board-col 의 box-shadow 가 --c 를 쓴다.) */
+.board-col > * { position: relative; z-index: 1; }
+
+/* 칸 머리(확인 필요 N)의 말풍선 — 딱지가 칸 오른쪽 끝에 붙어 있다. 왼쪽을
+   기준으로 펼치면 마지막 칸에서 화면 밖으로 나가 읽을 수 없다(#148).
+   오른쪽을 딱지에 맞추고 폭을 칸보다 좁게 못 박아 늘 칸 안에 들어오게 한다. */
+.board-col .col-head [data-tip]:hover::after,
+.board-col .col-head [data-tip]:focus-visible::after {
+  left: auto; right: 0; width: 244px; max-width: none;
+}
+
+/* ══ 담당자 오브 ══ 평면 원이 아니라 구로 읽히게. 바탕 그라데이션(orbBackground)
+   위에 ① 왼쪽 위 광 ② 아래로 가라앉는 그늘 ③ 바닥 그림자를 얹는다.
+   ::after 로 광을 그리는 이유 — background 는 orbBackground 가 쓰고 있다. */
+.board-orb {
+  position: relative;
+  box-shadow:
+    0 0 0 2px var(--ring, transparent),
+    inset 0 -2px 4px -1px rgba(0, 0, 0, 0.42),
+    inset 0 -5px 9px -5px rgba(0, 0, 0, 0.30),
+    inset 0 1px 1px rgba(255, 255, 255, 0.30),
+    0 1px 2px rgba(var(--cast), 0.30),
+    0 2px 5px -2px rgba(var(--cast), 0.26);
+}
+.board-orb::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.22) 26%, transparent 46%),
+    radial-gradient(circle at 68% 88%, rgba(255, 255, 255, 0.16) 0%, transparent 38%);
+}
+:root[data-theme="dark"] .board-orb {
+  box-shadow:
+    0 0 0 2px var(--ring, transparent),
+    inset 0 -2px 4px -1px rgba(0, 0, 0, 0.52),
+    inset 0 -5px 9px -5px rgba(0, 0, 0, 0.38),
+    inset 0 1px 1px rgba(255, 255, 255, 0.26),
+    0 1px 3px rgba(0, 0, 0, 0.55);
+}
+.board-orb-none {
+  border: 1px dashed var(--border-2);
+  box-shadow: none;
+}
+.board-orb-none::after { content: none; }
+
+/* 단추는 콘솔 것을 그대로 쓴다(.btn · .btn.primary) — 콘솔 규칙이 레이어 밖이라
+   어차피 보드가 @apply 로 쓴 선언을 덮고 있었다. 콘솔에 없는 초록 채움만 더한다.
+   ⚠ 레이어 안에 두면 콘솔의 .btn 바탕에 진다 — 여기(레이어 밖)에 있어야 한다. */
+.board-scope .btn.ok, .board-pop .btn.ok {
+  background: var(--green); border-color: var(--green);
+  color: var(--accent-ink); font-weight: 600;
+}
+.board-scope .btn.ok:hover, .board-pop .btn.ok:hover { filter: brightness(1.06); }
+
+/* 전체 반영 단추가 '한 번 더 누르세요' 로 대기할 때 — 숨을 쉰다.
+   무언가를 한꺼번에 바꾸기 직전이라는 걸 몸짓으로 알린다. */
+.board-scope .btn.ok { animation: armed-breathe 1.5s ease-in-out infinite; }
+@keyframes armed-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 55%, transparent); }
+  55% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--green) 0%, transparent), 0 0 22px -4px color-mix(in srgb, var(--green) 70%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-scope .btn.ok { animation: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Tailwind 를 걷어내며 옮겨 온 규칙 (#148)
+
+   보드는 Tailwind 로, 콘솔은 손으로 쓴 CSS 로 돼 있었다. 한 문서 안에서 두
+   체계가 같이 돌면 어느 쪽이 이기는지가 규칙(레이어 · 명시도 · !important)에
+   따라 달라져서, 이번 작업에서 생긴 버그가 거의 다 그 접점에서 나왔다 —
+   .grid 이름 충돌, 콘솔의 전역 input 규칙, 레이어 순서가 뒤집혀 숨을 것이
+   안 숨던 일. 그래서 className 을 전부 의미 이름으로 바꾸고 모양을 여기로
+   옮긴다. 이름은 .board-* 로 묶어 콘솔과 겹치지 않게 한다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 되풀이되는 조각 ── */
+.board-n { margin-left: 4px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+
+/* ── 배경 장(입자 캔버스) ── 콘솔 안에서는 화면이 아니라 보드 상자를 덮는다 */
+.board-field, .board-field-top {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+}
+.board-field { z-index: 0; }
+.board-field-top { z-index: 10; mix-blend-mode: screen; }
+
+/* ── 담당자 오브 ── 모양은 위쪽 .board-orb 규칙이 맡는다 */
+.board-orb { display: inline-block; flex: none; border-radius: 50%; }
+
+/* ── 단계 링 ── */
+.stage-ring { flex: none; }
+
+/* ── 보드 로고 ── */
+.board-logo { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; }
+.board-logo svg { width: 15px; height: 15px; }
+
+/* ── 뼈대(불러오는 중) ── */
+.board-skel-row { padding: 12px; }
+.board-skel-cols { display: flex; flex: 1; gap: 12px; padding: 16px 18px 0; }
+.board-skel-col { flex: 0 0 272px; height: 60vh; border-radius: 12px; }
+
+/* ══ 떠 있는 것들 ══ */
+.board-scrim { position: fixed; inset: 0; z-index: 45; background: var(--scrim); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+
+.board-modal {
+  position: fixed; left: 50%; top: 8vh; z-index: 55;
+  width: min(620px, calc(100vw - 24px)); max-height: 84vh; overflow-y: auto;
+  /* ⚠ transform 으로 가운데를 잡으면 안 된다 — framer-motion 이 뜨는 동안
+     transform 을 통째로 덮어써서 창이 오른쪽으로 쏠린다. 따로 있는 translate
+     속성을 쓴다(Tailwind 4 의 -translate-x-1/2 도 그래서 멀쩡했다, #148). */
+  translate: -50% 0;
+  padding: 20px; border-radius: 18px; border: none;
+  background: var(--pop); color: var(--text-2);
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.60),
+    0 40px 100px -24px rgba(var(--cast), 0.46),
+    0 8px 24px -12px rgba(var(--cast), 0.26);
+}
+.board-modal.wide { width: min(760px, calc(100vw - 24px)); }
+:root[data-theme="dark"] .board-modal {
+  box-shadow: inset 0 1px 0 rgba(170, 215, 240, 0.16), 0 40px 100px -20px rgba(0, 0, 0, 0.72);
+}
+.board-modal h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; color: var(--text); }
+.board-modal p { margin: 0; }
+
+/* 닫기(×) — 상세·모달이 같이 쓴다 */
+.board-x {
+  position: absolute; right: 14px; top: 14px; display: inline-flex;
+  padding: 6px; border-radius: 8px; color: var(--muted-2);
+  transition: background-color .15s, color .15s;
+}
+.board-x:hover { background: var(--hover); color: var(--text); }
+
+/* ══ 카드 속 ══ 재질은 위쪽 .board-card 가, 짜임새는 여기가 맡는다 */
+.board-card { position: relative; padding: 10px 12px; }
+.board-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.board-card-ref {
+  font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted-2);
+  text-decoration: none; transition: color .15s;
+}
+.board-card-ref:hover { color: var(--accent); }
+.board-card-orbs { margin-left: auto; display: flex; gap: 4px; }
+.board-card-main { display: flex; align-items: flex-start; gap: 8px; }
+.board-card-main .stage-ring { margin-top: 2px; }
+.board-card-title {
+  font-weight: 600; line-height: 1.42; color: var(--text);
+  overflow-wrap: anywhere; word-break: keep-all;
+}
+.board-card-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding-left: 22px; }
+.board-card-due { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.board-card-due.od { color: var(--red); }
+
+/* ══ 미연결 작업 ══ 칸반처럼 유리판 위에 얹는다(#148).
+   줄이 나란히 서는 목록이라 카드마다 그림자를 깊게 주면 어지럽다 — 면을 묽게
+   띄우고 올렸을 때만 떠오르게 한다. */
+.board-unl-head { max-width: 860px; margin-bottom: 16px; }
+.board-unl-head h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.board-unl-head p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.65; color: var(--muted); }
+.board-unl-head .at { margin-left: 4px; color: var(--muted-2); }
+
+.board-unl { display: flex; max-width: 860px; flex-direction: column; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.board-unl-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border: none; border-radius: var(--r-md, 14px);
+  text-decoration: none;
+  background-color: rgba(255, 255, 255, 0.40);
+  background-image: linear-gradient(166deg,
+    rgba(255, 255, 255, 0.70) 0%, rgba(255, 255, 255, 0.28) 32%,
+    rgba(226, 240, 249, 0.12) 64%, rgba(206, 230, 244, 0.22) 100%);
+  box-shadow:
+    inset 0 14px 20px -18px rgba(255, 255, 255, 0.90),
+    inset 0 -14px 20px -18px rgba(var(--cast), 0.22),
+    0 1px 3px -1px rgba(var(--cast), 0.12),
+    0 6px 14px -8px rgba(var(--cast), 0.16);
+  transition: background-color .18s, box-shadow .18s, transform .18s;
+}
+.board-unl-item:hover {
+  background-color: rgba(255, 255, 255, 0.58);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 14px 20px -18px rgba(255, 255, 255, 1),
+    inset 0 -14px 20px -18px rgba(var(--cast), 0.26),
+    0 2px 5px -1px rgba(var(--cast), 0.16),
+    0 12px 24px -10px rgba(var(--cast), 0.22);
+}
+:root[data-theme="dark"] .board-unl-item {
+  background-color: rgba(150, 215, 245, 0.055);
+  background-image: linear-gradient(166deg,
+    rgba(120, 230, 255, 0.13) 0%, rgba(120, 230, 255, 0.04) 30%,
+    rgba(120, 230, 255, 0.01) 62%, rgba(120, 230, 255, 0.07) 100%);
+  box-shadow:
+    inset 0 14px 20px -18px rgba(120, 230, 255, 0.34),
+    inset 0 -16px 22px -20px rgba(120, 230, 255, 0.36),
+    0 6px 16px -10px rgba(0, 0, 0, 0.58);
+}
+:root[data-theme="dark"] .board-unl-item:hover {
+  background-color: rgba(150, 215, 245, 0.11);
+  box-shadow:
+    inset 0 1px 0 rgba(190, 245, 255, 0.30),
+    inset 0 0 0 1px rgba(120, 230, 255, 0.18),
+    0 0 18px -8px rgba(79, 216, 255, 0.34),
+    0 10px 22px -12px rgba(0, 0, 0, 0.66);
+}
+/* 갈래 딱지 — PR 은 빨강(머지가 막혀 있다), 브랜치는 수수하게 */
+.board-unl-kind {
+  flex: none; padding: 2px 7px; border-radius: 7px;
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86), inset 0 0 0 1px rgba(255, 255, 255, 0.40);
+}
+.board-unl-kind.pr { color: var(--p-pink-ink); background: var(--p-pink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70); }
+:root[data-theme="dark"] .board-unl-kind {
+  color: var(--text-2); background: rgba(120, 230, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(190, 245, 255, 0.22), inset 0 0 0 1px rgba(120, 230, 255, 0.16);
+}
+:root[data-theme="dark"] .board-unl-kind.pr {
+  color: var(--red); background: color-mix(in srgb, var(--red) 16%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 190, 215, 0.24),
+    inset 0 0 0 1px color-mix(in srgb, var(--red) 32%, transparent),
+    0 0 10px -4px color-mix(in srgb, var(--red) 55%, transparent);
+}
+.board-unl-body { min-width: 0; flex: 1; }
+.board-unl-t { display: block; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-unl-s { display: block; font-size: 11.5px; color: var(--muted-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-unl-by { display: flex; flex: none; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+
+/* 비어 있을 때 — 같은 유리판에 한 줄 */
+.board-empty {
+  max-width: 860px; margin: 0; padding: 22px 16px; border-radius: var(--r-md, 14px);
+  text-align: center; font-size: 13px; color: var(--muted);
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.80), 0 2px 8px -5px rgba(var(--cast), 0.18);
+}
+:root[data-theme="dark"] .board-empty {
+  background: rgba(120, 230, 255, 0.06);
+  box-shadow: inset 0 1px 1px rgba(190, 245, 255, 0.20), inset 0 0 0 1px rgba(120, 230, 255, 0.10);
+}
+
+/* ══ 칸반 판 ══ */
+.board-cols {
+  display: flex; min-height: 0; flex: 1; gap: 12px;
+  overflow-x: auto; overflow-y: hidden; padding: 16px 18px 0;
+}
+.board-col {
+  position: relative; display: flex; flex-direction: column;
+  min-height: 0; flex: 0 0 272px;
+  transition: box-shadow .2s, transform .2s, opacity .2s;
+}
+/* 카드를 들고 이 칸 위에 왔을 때 — 단계 색으로 떠오른다 */
+.board-col.glow {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent),
+    0 18px 60px -18px color-mix(in srgb, var(--c) 55%, transparent),
+    inset 0 0 80px -30px color-mix(in srgb, var(--c) 45%, transparent);
+}
+/* 놓을 수 없는 칸(미분류)은 물러난다 */
+.board-col.dim { opacity: .55; }
+
+.col-head {
+  margin: 0; display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px 10px; font-size: 13px; font-weight: 600; color: var(--text);
+}
+/* 몇 건인지 — 제목 옆 숫자. 다크에서 --muted-2 는 바탕에 묻힌다(#148) */
+.col-head .board-col-n { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); }
+:root[data-theme="dark"] .col-head .board-col-n { color: var(--text-2); }
+.col-head .board-col-risk { margin-left: auto; padding: 1px 9px; font-size: 11.5px; font-weight: 600; }
+
+.board-col-list {
+  display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 8px;
+  overflow-y: auto; overflow-x: hidden; padding: 4px 8px 10px;
+}
+/* 카드가 내려앉을 자리 — 들고 있는 동안 맨 위가 벌어진다 */
+.board-slot {
+  flex: none; border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--c) 65%, transparent);
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+}
+/* 빈 칸 — 묽은 유리 위에서 --muted-2 는 양쪽 테마 모두 안 읽혔다(#148) */
+.board-col-empty {
+  border: 1px dashed var(--border-2); border-radius: 10px;
+  padding: 14px 6px; text-align: center;
+  font-size: 12.5px; font-weight: 500; color: var(--text-2);
+}
+
+/* 카드 바깥 껍데기 — 집기·고름·끌림 상태가 여기 붙는다 */
+.board-cardwrap { position: relative; border-radius: var(--r-md, 16px); outline: none; cursor: grab; }
+.board-cardwrap.locked { cursor: default; }
+.board-cardwrap.picked > .board-card {
+  outline: 3px solid var(--accent-soft); outline-offset: 0;
+}
+.board-cardwrap.dragging > .board-card {
+  outline: 1px dashed color-mix(in srgb, var(--c) 60%, transparent);
+}
+.board-ghost-wrap { cursor: grabbing; will-change: transform; }
+
+/* 말풍선이 옆 칸 뒤로 숨던 것(#148) — 칸은 나란한 형제라 뒤에 오는 칸이 위에
+   깔린다. 말풍선의 z-index(300)는 제 칸 안에서만 통하므로, 올린 칸 자체를
+   형제들보다 위로 띄워야 한다. */
+.board-col:hover, .board-col:focus-within { z-index: 20; }
+/* 칸 안에서도 마찬가지다 — .board-col > * 가 머리와 카드 목록에 똑같이 z-index:1
+   을 줘서, 뒤에 오는 카드 목록이 머리 위에 깔렸다. 말풍선의 z-index 는 제 머리
+   안에서만 통하므로 카드 뒤로 들어간다. 머리를 목록보다 위에 둔다. */
+.board-col > .col-head { z-index: 3; }
+
+/* ══ 다크의 보조 글자 ══ 콘솔의 --muted-2(#676b74)는 납작한 패널 위를 전제로
+   한 값이다. 보드는 유리라 바탕이 한 겹 더 밝고, 그 위에서는 읽히지 않는다 —
+   카드의 저장소#번호, 미연결 목록의 두 번째 줄, 개수 숫자가 그랬다(#148).
+   한 단계 올려 --muted 로 둔다. */
+:root[data-theme="dark"] .board-n,
+:root[data-theme="dark"] .board-card-ref,
+:root[data-theme="dark"] .board-unl-s,
+:root[data-theme="dark"] .board-unl-head .at { color: var(--muted); }
+
+/* ══ 사이드바 ══ 재질은 위쪽 .board-side 가, 짜임새는 여기가 맡는다 */
+.board-side {
+  position: relative; z-index: 1;
+  display: flex; min-height: 0; flex-direction: column; gap: 14px;
+  overflow-y: auto; padding: 14px 10px 12px;
+}
+@media (max-width: 900px) { .board-side { display: none; } }
+
+.board-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 8px 6px; font-size: 13.5px; font-weight: 600; color: var(--text);
+}
+.board-brand small { display: block; font-size: 11px; font-weight: 500; color: var(--muted-2); }
+
+.board-nav { display: flex; flex-direction: column; gap: 1px; }
+.board-sec { display: flex; flex-direction: column; gap: 1px; padding-top: 14px; }
+.board-sec h4 {
+  margin: 0 0 6px; display: flex; align-items: center; gap: 8px;
+  padding: 0 8px; font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.board-sec h4 svg { color: var(--muted-2); }
+
+.board-navbtn {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 6px 8px; text-align: left;
+}
+.board-navbtn-ic { display: inline-flex; width: 16px; align-items: center; justify-content: center; }
+.board-navbtn-n { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted-2); }
+/* ⚠ .on 은 빼고 본다 — 고른 알약의 숫자는 아래에서 흰색으로 정한다. 같은
+   명시도(0,3,0)라 뒤에 오는 이 규칙이 이겨서 파란 바탕에 회색 숫자가 됐다. */
+:root[data-theme="dark"] .board-navbtn:not(.on) .board-navbtn-n { color: var(--muted); }
+
+.board-foot {
+  margin-top: auto; padding: 0 8px;
+  font-size: 11.5px; line-height: 1.4; font-variant-numeric: tabular-nums; color: var(--muted-2);
+}
+
+/* ══ 카드 상세 ══ 오른쪽에서 밀려 들어오는 창. 재질은 모달과 같다. */
+.board-drawer {
+  position: fixed; right: 10px; top: 10px; bottom: 10px; z-index: 50;
+  width: 420px; max-width: calc(100vw - 20px); overflow-y: auto;
+  padding: 20px; border-radius: 18px; border: none;
+  background: var(--pop); color: var(--text-2);
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.60),
+    0 30px 80px -24px rgba(var(--cast), 0.46),
+    0 8px 24px -12px rgba(var(--cast), 0.26);
+}
+:root[data-theme="dark"] .board-drawer {
+  box-shadow: inset 0 1px 0 rgba(170, 215, 240, 0.16), 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+.board-drawer-ref { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.board-drawer h3 {
+  margin: 10px 32px 4px 0; font-size: 17px; font-weight: 600;
+  letter-spacing: -.02em; color: var(--text); word-break: keep-all;
+}
+.board-drawer-link { color: var(--accent); text-decoration: none; }
+.board-drawer-link:hover { text-decoration: underline; }
+.board-drawer-acts { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 이름-값 표 */
+.board-kv {
+  margin: 20px 0 0; display: inline-grid; width: 100%;
+  grid-template-columns: 84px 1fr; column-gap: 12px; row-gap: 10px; font-size: 12.5px;
+}
+.board-kv dt { color: var(--muted); }
+.board-kv dd { margin: 0; overflow-wrap: break-word; color: var(--text-2); }
+.board-inline { display: flex; align-items: center; gap: 6px; }
+
+/* ══ 명령 팔레트(⌘K) ══ */
+.board-cmd {
+  position: fixed; left: 50%; top: 14vh; z-index: 55;
+  width: min(620px, calc(100vw - 24px)); translate: -50% 0;   /* transform 은 framer 가 쓴다 */
+  overflow: hidden; border-radius: 18px; border: none;
+  background: var(--pop); color: var(--text-2);
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.60),
+    0 40px 100px -24px rgba(var(--cast), 0.42),
+    0 8px 24px -12px rgba(var(--cast), 0.24);
+}
+:root[data-theme="dark"] .board-cmd {
+  box-shadow: inset 0 1px 0 rgba(170, 215, 240, 0.16), 0 40px 100px -20px rgba(0, 0, 0, 0.6);
+}
+.board-cmd-list { max-height: 52vh; overflow-y: auto; padding: 6px; }
+.board-cmd-list [cmdk-group-heading] {
+  padding: 8px 10px 4px; font-size: 11.5px; font-weight: 600; color: var(--muted-2);
+}
+.board-cmd-item {
+  display: flex; cursor: pointer; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 10px; color: var(--text-2);
+}
+.board-cmd-item[data-selected="true"] { background: var(--accent-soft); color: var(--text); }
+.board-cmd-empty { padding: 12px 10px; color: var(--muted-2); }
+.board-cmd-gap { width: 13px; flex: none; }
+.board-cmd-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-cmd-s { margin-left: auto; white-space: nowrap; font-size: 11.5px; color: var(--muted-2); }
+:root[data-theme="dark"] .board-cmd-s, :root[data-theme="dark"] .board-cmd-list [cmdk-group-heading] { color: var(--muted); }
+
+/* ══ 모달 속 ══ */
+.board-note { margin: 0 0 14px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.board-modal h5 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.board-dim { font-size: 12px; color: var(--muted); }
+.board-row { display: flex; gap: 8px; }
+
+/* 사람 알약 — 콘솔의 .chip.svc 와 같은 말투(아바타 + 이름) */
+.board-people { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.board-person {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 10px 4px 4px; border-radius: 999px; border: none;
+  color: var(--text); font-size: 12.5px;
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86), inset 0 0 0 1px rgba(122, 166, 190, 0.18);
+}
+.board-person.add { color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-2); background: transparent; }
+.board-person.add:hover { color: var(--text); background: var(--hover); box-shadow: inset 0 0 0 1px var(--accent); }
+:root[data-theme="dark"] .board-person {
+  background: rgba(120, 230, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(190, 245, 255, 0.20), inset 0 0 0 1px rgba(120, 230, 255, 0.16);
+}
+:root[data-theme="dark"] .board-person.add { background: transparent; box-shadow: inset 0 0 0 1px var(--border-2); }
+.board-person-x { padding: 0 2px; border-radius: 999px; color: var(--muted-2); }
+.board-person-x:hover { color: var(--red); }
+
+/* ══ 저장소 모달 ══
+   ⚠ bare 'grid' 는 쓰지 않는다 — 콘솔이 .grid 를 레이어 밖에서 auto-fill 300px
+   으로 정의해 칸 수를 덮는다(#148). 이름을 따로 둔다. */
+.board-repo-grid {
+  display: inline-grid; width: 100%;
+  grid-template-columns: minmax(0, 1fr) 260px 64px;
+  align-items: center; gap: 10px;
+}
+.board-repo-head { padding: 0 10px 6px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.board-info { padding-left: 4px; color: var(--muted); }
+.board-info:hover { color: var(--accent); }
+.board-legend {
+  margin-bottom: 12px; display: inline-grid; width: 100%;
+  grid-template-columns: max-content 1fr; column-gap: 14px; row-gap: 6px;
+  padding: 10px 12px; border-radius: 10px; border: none; font-size: 12px;
+  background: rgba(255, 255, 255, 0.40);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80), inset 0 0 0 1px rgba(122, 166, 190, 0.18);
+}
+:root[data-theme="dark"] .board-legend {
+  background: rgba(120, 230, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(190, 245, 255, 0.18), inset 0 0 0 1px rgba(120, 230, 255, 0.14);
+}
+.board-legend b { white-space: nowrap; font-weight: 600; color: var(--text); }
+.board-legend span { color: var(--muted); }
+
+.board-list {
+  margin: 0 0 14px; padding: 0; list-style: none; overflow-y: auto;
+  border-radius: 12px; border: none;
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.80), inset 0 0 0 1px rgba(122, 166, 190, 0.16);
+}
+:root[data-theme="dark"] .board-list {
+  background: rgba(120, 230, 255, 0.055);
+  box-shadow: inset 0 1px 1px rgba(190, 245, 255, 0.18), inset 0 0 0 1px rgba(120, 230, 255, 0.12);
+}
+.board-list.tall { max-height: 32vh; }
+.board-list.short { max-height: 28vh; }
+.board-list > li + li { border-top: 1px solid var(--border); }
+.board-list > li { padding: 8px 10px; }
+.board-list-empty { color: var(--muted); }
+.board-repo-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text); }
+.board-repo-cell { display: flex; min-width: 0; flex-direction: column; }
+.board-repo-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.board-repo-note { font-size: 11.5px; color: var(--muted); }
+.board-ok { justify-self: end; color: var(--green); }
+.board-scope .btn.board-del, .board-pop .btn.board-del { justify-self: end; }
+.board-pop .btn.board-del:hover { border-color: color-mix(in srgb, var(--red) 50%, transparent); color: var(--red); }
+.board-pop .btn.board-add { justify-self: end; border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.board-pop .btn.board-add:hover { background: var(--accent); color: var(--accent-ink); }
+
+/* ══ 보드 도구 줄 ══ */
+.board-topbar {
+  position: relative; z-index: 30;
+  display: flex; min-height: 52px; flex: none; align-items: center; gap: 10px;
+  padding: 10px 18px; border-bottom: 1px solid var(--border);
+}
+.board-spacer { flex: auto; }
+.board-searchwrap { position: relative; display: inline-flex; }
+.board-search-ic {
+  pointer-events: none; position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%); color: var(--muted-2);
+}
+@media (max-width: 900px) {
+  .board-topbar { flex-wrap: wrap; row-gap: 8px; }
+  .board-searchwrap { flex: 1 1 140px; }
+  /* 좁으면 ⌘K 는 숨는다 — 손가락으로는 못 누르는 단축키다 */
+  .tbtn.wide-only { display: none; }
+}
+
+/* 모달 속 입력칸 — 폭은 각자 정한다(블랭킷 규칙이 width 를 안 건드린다) */
+.board-pop .board-repo-q { width: 100% !important; margin-bottom: 8px; }
+.board-row input { flex: 1; }
+
+/* ══ 주간보고 ══ 재질은 위쪽 .board-report 가, 짜임새는 여기가 맡는다 */
+.board-rp { margin: 0 auto; max-width: 1180px; }
+.board-rp-head { margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.board-rp-head h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+.board-rp-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.board-rp-counts .board-badge { padding: 2px 10px; font-size: 11.5px; font-weight: 600; }
+.board-rp-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+
+/* 시트에 이 주차 열이 없을 때 — 콘솔의 파스텔 경고 면과 같은 말투 */
+.board-rp-warn {
+  margin-bottom: 14px; padding: 10px 12px; border: none; border-radius: 10px;
+  font-size: 12.5px; color: var(--p-yellow-ink); background: var(--p-yellow);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+:root[data-theme="dark"] .board-rp-warn {
+  color: var(--amber); background: color-mix(in srgb, var(--amber) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 28%, transparent);
+}
+
+/* 프로젝트 판이 깔리는 격자 — 420px 아래로는 안 쪼갠다 */
+.board-rp-grid {
+  display: inline-grid; width: 100%; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+}
+@media (max-width: 520px) { .board-rp-grid { grid-template-columns: 1fr; } }
+.board-rp-grid.faded { opacity: .6; }
+.board-rp-sub { margin: 28px 0 12px; }
+.board-rp-sub h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+.board-rp-sub span { font-size: 12px; color: var(--muted-2); }
+:root[data-theme="dark"] .board-rp-sub span { color: var(--muted); }
+
+/* ── 프로젝트 판 ── 카드와 같은 유리를 쓰되 한 단계 큰 면이다 */
+.board-panel {
+  display: flex; min-width: 0; flex-direction: column; gap: 12px;
+  padding: 16px; border: none; border-radius: var(--r-md, 18px);
+  background: var(--panel-2);
+  background-image: linear-gradient(166deg,
+    rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.40) 28%,
+    rgba(226, 240, 249, 0.22) 60%, rgba(206, 230, 244, 0.30) 100%);
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.85),
+    inset 0 -20px 28px -22px rgba(var(--cast), 0.24),
+    0 2px 5px -1px rgba(var(--cast), 0.12),
+    0 10px 20px -9px rgba(var(--cast), 0.16);
+  transition: box-shadow .18s;
+}
+:root[data-theme="dark"] .board-panel {
+  background: rgba(150, 215, 245, 0.055);
+  background-image: linear-gradient(166deg,
+    rgba(120, 230, 255, 0.12) 0%, rgba(120, 230, 255, 0.04) 30%,
+    rgba(120, 230, 255, 0.01) 60%, rgba(120, 230, 255, 0.07) 100%);
+  box-shadow:
+    inset 0 20px 28px -22px rgba(120, 230, 255, 0.32),
+    inset 0 -22px 30px -24px rgba(120, 230, 255, 0.36),
+    0 10px 24px -14px rgba(0, 0, 0, 0.6);
+}
+/* 경고가 있는 판은 분홍 그림자, 반영된 판은 초록 그림자 — 선은 긋지 않는다 */
+.board-panel.warn {
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.72),
+    inset 0 -20px 28px -22px rgba(205, 60, 85, 0.22),
+    0 2px 5px -1px rgba(205, 60, 85, 0.16),
+    0 10px 22px -9px rgba(205, 60, 85, 0.22);
+}
+.board-panel.ok {
+  box-shadow:
+    inset 0 20px 28px -22px rgba(255, 255, 255, 0.72),
+    inset 0 -20px 28px -22px rgba(39, 101, 75, 0.20),
+    0 2px 5px -1px rgba(39, 101, 75, 0.14),
+    0 10px 22px -9px rgba(39, 101, 75, 0.20);
+}
+:root[data-theme="dark"] .board-panel.warn {
+  box-shadow:
+    inset 0 20px 28px -22px color-mix(in srgb, var(--red) 40%, transparent),
+    inset 0 -22px 30px -24px color-mix(in srgb, var(--red) 50%, transparent),
+    0 0 20px -10px color-mix(in srgb, var(--red) 46%, transparent),
+    0 10px 24px -14px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme="dark"] .board-panel.ok {
+  box-shadow:
+    inset 0 20px 28px -22px color-mix(in srgb, var(--green) 36%, transparent),
+    inset 0 -22px 30px -24px color-mix(in srgb, var(--green) 44%, transparent),
+    0 0 20px -10px color-mix(in srgb, var(--green) 42%, transparent),
+    0 10px 24px -14px rgba(0, 0, 0, 0.6);
+}
+
+.board-panel h3 {
+  margin: 0; display: flex; align-items: center; gap: 8px;
+  font-size: 14.5px; font-weight: 600; color: var(--text);
+}
+.board-panel h3 .ms { font-size: 12px; font-weight: 500; color: var(--muted); }
+.board-panel h3 .board-badge { margin-left: auto; padding: 2px 10px; font-size: 11.5px; font-weight: 600; }
+
+.board-tasks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.board-tasks li { display: flex; min-width: 0; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.board-tasks .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-tasks .s { margin-left: auto; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+
+.board-scope .board-rp-text {
+  width: 100% !important; min-height: 120px !important; resize: vertical;
+  padding: 10px 12px !important; font-size: 12.5px !important; line-height: 1.65 !important;
+}
+
+/* 경고 목록 — 분홍 파스텔 면 */
+.board-warns {
+  margin: 0; padding: 8px 10px 8px 24px; border: none; border-radius: 10px;
+  font-size: 12px; color: var(--p-pink-ink); background: var(--p-pink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+:root[data-theme="dark"] .board-warns {
+  color: var(--red); background: color-mix(in srgb, var(--red) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 28%, transparent);
+}
+
+.board-sheet { font-size: 12px; color: var(--muted); }
+.board-sheet summary { cursor: pointer; }
+.board-sheet pre {
+  margin: 6px 0 0; padding: 8px 10px; border-radius: 10px;
+  white-space: pre-wrap; font-family: inherit; color: var(--muted);
+  background: rgba(255, 255, 255, 0.40);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 0 0 1px rgba(122, 166, 190, 0.14);
+}
+:root[data-theme="dark"] .board-sheet pre {
+  background: rgba(120, 230, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(120, 230, 255, 0.12);
+}
+
+.board-panel-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.board-panel-foot .who { margin-right: auto; font-size: 11.5px; color: var(--muted); }
+
+/* 불러오는 중 */
+.board-rp-skel-head { margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+.board-rp-skel-panel { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; background: var(--panel-2); }
+.board-rp-fail { display: inline-grid; width: 100%; justify-items: center; gap: 12px; padding: 64px 0; color: var(--muted); }
+
+/* 보드 본문 — 사이드바 오른쪽, 도구 줄 아래 */
+.board-main { position: relative; z-index: 1; display: flex; min-height: 0; min-width: 0; flex-direction: column; }
+
+/* 판정이 반쪽일 때의 알림 줄 */
+.board-alert {
+  margin: 10px 18px 0; padding: 8px 12px; border: none; border-radius: 10px;
+  font-size: 12px; color: var(--p-pink-ink); background: var(--p-pink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+:root[data-theme="dark"] .board-alert {
+  color: var(--red); background: color-mix(in srgb, var(--red) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 28%, transparent);
+}
+
+/* ══ 알림(sonner) ══ 보드는 늘 다크 테마 알림을 띄웠다 — 콘솔 안에서는 밝은
+   테마에 검은 상자가 떠서 혼자 논다. 콘솔의 창(--pop)과 같은 유리로 맞춘다.
+   ⚠ sonner 가 제 스타일을 inline 으로 붙이므로 !important 로 덮어야 한다. */
+[data-sonner-toast].board-toast {
+  background: var(--pop) !important;
+  color: var(--text) !important;
+  border: none !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.60),
+    0 18px 50px -20px rgba(var(--cast), 0.42),
+    0 4px 14px -8px rgba(var(--cast), 0.24) !important;
+}
+:root[data-theme="dark"] [data-sonner-toast].board-toast {
+  box-shadow: inset 0 1px 0 rgba(170, 215, 240, 0.16), 0 18px 50px -18px rgba(0, 0, 0, 0.7) !important;
+}
+[data-sonner-toast] .board-toast-act {
+  background: var(--accent) !important; color: var(--accent-ink) !important; font-weight: 600 !important;
+}
+[data-sonner-toast] .board-toast-cancel {
+  background: var(--hover) !important; color: var(--text-2) !important;
+}

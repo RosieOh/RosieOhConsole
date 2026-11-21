@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Rosie 콘솔</title>
+  </head>
+  <body>
+    <!-- 리퀴드 글래스 굴절 — 채널마다 변위량을 달리해 색분산까지(R 7 / G 5 / B 3) -->
+    <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;pointer-events:none">
+      <defs>
+        <filter id="mx-lens" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.004 0.008" numOctaves="1" seed="19" result="n"></feTurbulence>
+          <feGaussianBlur in="n" stdDeviation="6" result="m"></feGaussianBlur>
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="7" xChannelSelector="R" yChannelSelector="G" result="dr"></feDisplacementMap>
+          <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="R"></feColorMatrix>
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="5" xChannelSelector="R" yChannelSelector="G" result="dg"></feDisplacementMap>
+          <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="G"></feColorMatrix>
+          <feDisplacementMap in="SourceGraphic" in2="m" scale="3" xChannelSelector="R" yChannelSelector="G" result="db"></feDisplacementMap>
+          <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="B"></feColorMatrix>
+          <feBlend in="R" in2="G" mode="screen" result="RG"></feBlend>
+          <feBlend in="RG" in2="B" mode="screen"></feBlend>
+        </filter>
+      </defs>
+    </svg>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

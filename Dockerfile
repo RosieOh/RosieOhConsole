@@ -1,0 +1,32 @@
+# ── web (React 19 · Vite 8) 빌드 ──
+FROM node:22-alpine AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+ARG VITE_GITHUB_OWNER=RosieOh
+ENV VITE_GITHUB_OWNER=$VITE_GITHUB_OWNER
+COPY web/ ./
+RUN npm run build && npm test
+
+# ── api (NestJS 12, ESM) 빌드 ──────────────────────────
+FROM node:22-alpine AS api
+WORKDIR /api
+COPY api/package.json api/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY api/ ./
+RUN npm run build && npm test
+
+# ── 런타임 (NestJS 가 API + React 빌드 동시 서빙) ───────
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production TZ=Asia/Seoul
+COPY api/package.json api/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY --from=api /api/dist ./dist
+COPY api/docs ./docs
+COPY --from=web /web/dist ./public
+# 콘솔 데이터(감사 로그·배포 기록 캐시·카탈로그·권한) — 볼륨을 /data 에 붙인다. 처음 붙을 때 이 소유자를 물려받는다
+RUN mkdir -p /data && chown node:node /data
+USER node
+EXPOSE 8087
+CMD ["node", "dist/main.js"]
