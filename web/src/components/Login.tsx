@@ -4,6 +4,7 @@ import LiquidGlass from 'liquid-glass-react';
 import { api, passwordProblem } from '../api';
 import { applyTheme, currentTheme } from '../theme';
 import { LiquidBg } from './LiquidBg';
+import { Scene3D } from './Scene3D';
 
 // GitHub 로그인이 돌려보낸 ?login=<code> — 서버(auth.controller)의 갈래와 같은 이름
 const REASON: Record<string, [string, 'err' | 'ok']> = {
@@ -26,13 +27,31 @@ export function GithubMark({ size = 16 }: { size?: number }) {
   );
 }
 
-/** 로그인·회원가입 공통 틀 — 오로라 배경 + 유리 카드 + 테마 버튼 */
-export function AuthFrame({ children, width = 520 }: { children: React.ReactNode; width?: number }) {
+/** 첫 화면 왼쪽 소개 — 넓은 화면에서만 보인다(좁으면 3D 고리가 그 자리를 채운다) */
+function Hero() {
+  return (
+    <section className="auth-hero" aria-label="소개">
+      <span className="auth-kicker">RosieOh · Console</span>
+      <h1>저장소부터 배포까지,<br />한 화면에서.</h1>
+      <p>GitHub 저장소 90개와 조직 프로젝트의 배포 흐름, 러너, 서버, 시크릿을 Rosie 콘솔 하나로 봅니다.</p>
+      <ul>
+        <li>서비스 카탈로그와 배포 현황</li>
+        <li>GitHub Actions 배포 흐름 도식</li>
+        <li>회원·권한과 감사 기록</li>
+      </ul>
+    </section>
+  );
+}
+
+/** 로그인·회원가입 공통 틀 — 3D 배경(안 되면 오로라) + 유리 카드 + 테마 버튼. hero 면 왼쪽 소개를 두고 카드는 오른쪽으로 */
+export function AuthFrame({ children, width = 520, hero = false }: { children: React.ReactNode; width?: number; hero?: boolean }) {
   const [dark, setDark] = useState(() => currentTheme() === 'dark');
+  const [flat, setFlat] = useState(false);   // WebGL 이 안 되면 기존 오로라
   const flip = () => { const next = dark ? 'light' : 'dark'; applyTheme(next); setDark(!dark); };
   return (
-    <div className="login-wrap">
-      <LiquidBg />
+    <div className={'login-wrap auth-3d' + (hero ? ' has-hero' : '')}>
+      {flat ? <LiquidBg /> : <Scene3D focusX={hero ? 0.485 : 0.17} onFail={() => setFlat(true)} />}
+      {hero && <Hero />}
       <button className="login-theme" onClick={flip} aria-label="테마 바꾸기" title={dark ? '밝게' : '어둡게'}>
         {dark ? <Sun size={17} /> : <Moon size={17} />}
       </button>
@@ -40,7 +59,7 @@ export function AuthFrame({ children, width = 520 }: { children: React.ReactNode
           position 과 top/left 를 반드시 넘겨야 한다(안 넘기면 내부 레이어가 나란히 흐른다).
           형제로 뿌리는 림/음영 레이어는 styles.css 에서 끄고 테두리를 직접 그린다. */}
       <LiquidGlass className="login-glass" cornerRadius={28} padding="40px 44px 34px" displacementScale={68} blurAmount={0.06}
-        saturation={135} aberrationIntensity={2} elasticity={0.14} style={{ position: 'absolute', top: '50%', left: '50%', width }}>
+        saturation={135} aberrationIntensity={2} elasticity={0.14} style={{ position: 'absolute', top: '50%', left: 'var(--auth-card-x, 50%)', width: `min(${width}px, calc(100vw - 32px))` }}>
         <div className="login-box">{children}</div>
       </LiquidGlass>
     </div>
@@ -63,7 +82,7 @@ export function Login() {
   }
 
   return (
-    <AuthFrame>
+    <AuthFrame hero width={460}>
       <span className="login-brand brand-logo" aria-label="RosieOh" />
       <h2>Rosie 콘솔</h2>
       <p>콘솔 계정이나 GitHub 계정으로 로그인합니다.</p>
