@@ -47,7 +47,7 @@ export function extractClues(text: string): Clue[] {
 const KEY_RULES: [RegExp, string][] = [
   [/^(SPRING_)?(DB|DATABASE|DATASOURCE|MYSQL|MARIADB|POSTGRES|JDBC)(_|$)|_DB_URL$|DATASOURCE_URL/, 'kind:db'],
   [/^REDIS_|_REDIS_|^SPRING_(DATA_)?REDIS/, 'kind:redis'],
-  [/^(FCM|FIREBASE)_|_FCM_|GOOGLE_APPLICATION_CREDENTIALS/, 'infra:firebase'],
+  [/(^(FCM|FIREBASE)_)|_FCM_|GOOGLE_APPLICATION_CREDENTIALS/, 'infra:firebase'],
   [/^(AWS|S3|SES)_/, 'infra:aws'],
   [/^HOT_UPDATER_|^SUPABASE_/, 'infra:ota'],
 ];

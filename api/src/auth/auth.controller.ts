@@ -33,7 +33,10 @@ export class AuthController {
 
   // GitHub 이 돌려보낸 곳 — 신원 확인 → (연결 | 로그인·가입 요청) → 세션 쿠키
   @Get('oauth/callback')
-  async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: Request, @Res() res: Response) {
+  async callback(@Query('code') codeQ: unknown, @Query('state') stateQ: unknown, @Req() req: Request, @Res() res: Response) {
+    // 같은 이름을 여러 번 보내면 배열이 된다 — 문자열 하나가 아니면 받지 않는다
+    const code = typeof codeQ === 'string' ? codeQ : '';
+    const state = typeof stateQ === 'string' ? stateQ : '';
     const want = String(req.cookies?.[STATE_COOKIE] || '');
     res.clearCookie(STATE_COOKIE, cookieOpts());
     const ok = want && state && want.length === state.length && timingSafeEqual(Buffer.from(want), Buffer.from(state));

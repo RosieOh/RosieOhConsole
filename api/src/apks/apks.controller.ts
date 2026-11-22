@@ -3,7 +3,9 @@ import type { Request, Response } from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { sessionOf } from '../auth/session.js';
-import { cfg, originOk } from '../config.js';
+import { cfg, full, originOk } from '../config.js';
+import { ghUrl } from '../github.js';
+import { logSafe } from '../safe.js';
 import { ApksService } from './apks.service.js';
 import { contentDisposition, rateLimiter } from './release.js';
 import { WHO_RE } from './knox.js';
@@ -83,7 +85,7 @@ export class ApksController {
     res.on('close', () => ac.abort());
     let up: globalThis.Response;
     try {
-      up = await fetch(hit.url, { headers: { Accept: 'application/octet-stream', ...(cfg.githubToken ? { Authorization: `Bearer ${cfg.githubToken}` } : {}) }, signal: ac.signal });
+      up = await fetch(ghUrl(`repos/${full(repo)}/releases/assets/${hit.asset.id}`), { headers: { Accept: 'application/octet-stream', ...(cfg.githubToken ? { Authorization: `Bearer ${cfg.githubToken}` } : {}) }, signal: ac.signal });
     } catch {
       clearTimeout(headerTimer);
       if (!res.headersSent) res.status(502).json({ message: 'GitHub 에서 APK 를 받지 못했다' });
@@ -95,7 +97,7 @@ export class ApksController {
       return;
     }
 
-    console.log(`[APK] ${sessionOf(req)?.login ?? '-'}@${req.ip} ← ${repo} ${hit.release.tag} ${hit.asset.name}`);
+    console.log(`[APK] ${logSafe(sessionOf(req)?.login ?? '-')}@${logSafe(req.ip)} ← ${logSafe(repo)} ${logSafe(hit.release.tag)} ${logSafe(hit.asset.name)}`);
     // 내부 테스트 빌드는 QA 상태(녹스) 와 상관없어 받은 기록을 남기지 않는다
     if (!hit.test) try { this.apks.recordDownload(repo, hit.release.tag, sessionOf(req)?.login ?? `IP ${req.ip}`); } catch { /* 기록 실패해도 받기는 된다 */ }
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');

@@ -6,6 +6,7 @@ import { sessionOf } from '../auth/session.js';
 import { REPO_RE, cfg, full, originOk } from '../config.js';
 import { ghFetch, ghGraphql, ghJson, ownerRepos } from '../github.js';
 import { JsonStore, Versioned } from '../json-store.js';
+import { isSafeKey } from '../safe.js';
 import { BLOCKED_LABEL, Card, GqlIssue, STAGES, STAGE_COLOR, STAGE_KO, STAGE_LABEL, Stage, draftReport, stageLabels, toCard } from './derive.js';
 
 // 업무보드 — GitHub Issues·PR 로 만든 칸반과 주간보고. 화면은 web/src/board(같은 SPA), API 는 /board/api/*(main.ts 가 넘긴다)
@@ -281,7 +282,7 @@ export class BoardService {
 
   private async reportAct(s: { login: string; admin: boolean }, b: any) {
     const project = String(b?.project || '');
-    if (!this.store.get().repos.some((r) => r.repo === project)) throw new HttpError(400, '없는 프로젝트입니다');
+    if (!isSafeKey(project) || !this.store.get().repos.some((r) => r.repo === project)) throw new HttpError(400, '없는 프로젝트입니다');
     const week = isoWeek().key;
     const now = new Date().toISOString();
     if (b?.action === 'save' || b?.action === 'reflect') {

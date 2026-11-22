@@ -1,8 +1,19 @@
 import { cfg, full } from './config.js';
 
+/** GitHub API 주소 — path 가 API 밖(다른 호스트·'..' 로 거슬러 오르기)으로 나가면 거절한다. 토큰이 붙어 나가는 길이라서 */
+export function ghUrl(path: string): URL {
+  const base = new URL(cfg.githubApi.replace(/\/?$/, '/'));
+  const rel = path.replace(/^\/+/, '');
+  const segs = rel.split(/[?#]/)[0].split('/');
+  if (/^[a-z][a-z0-9+.-]*:/i.test(rel) || segs.some((s) => /^(\.|%2e){1,2}$/i.test(s))) throw new Error(`GitHub API 경로가 올바르지 않습니다: ${rel.slice(0, 80)}`);
+  const url = new URL(rel, base);
+  if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) throw new Error('GitHub API 밖으로 나가는 경로입니다');
+  return url;
+}
+
 // GitHub REST API — 읽기 토큰으로. 404 는 null.
 export async function ghFetch(path: string, init: RequestInit = {}, token = cfg.githubToken, timeoutMs = 15000): Promise<Response> {
-  return fetch(`${cfg.githubApi}/${path.replace(/^\//, '')}`, {
+  return fetch(ghUrl(path), {
     ...init,
     headers: {
       Accept: 'application/vnd.github+json',

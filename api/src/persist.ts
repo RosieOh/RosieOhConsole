@@ -167,7 +167,12 @@ export async function readAudit(n: number): Promise<AuditRow[]> {
 }
 
 // ── 파일(로고 등) — 이름이 내용 해시라 한 번 쓰면 바뀌지 않는다. 이름 목록은 메모리에(동기 확인용) ──
-const blobPath = (name: string) => `${cfg.dataDir}/${name}`;
+/** blob 이름은 '<폴더>/<파일>' 하나뿐 — '..'·절대 경로로 DATA_DIR 밖을 건드리지 못하게 */
+const BLOB_RE = /^[a-z0-9-]{1,40}\/[A-Za-z0-9_-][A-Za-z0-9._-]{0,120}$/;
+const blobPath = (name: string) => {
+  if (!BLOB_RE.test(name) || name.includes('..')) throw new Error(`blob 이름이 올바르지 않습니다: ${name.slice(0, 80)}`);
+  return `${cfg.dataDir}/${name}`;
+};
 const blobNames = new Set<string>();
 const blobWrites = new Set<Promise<void>>();
 
@@ -176,7 +181,8 @@ export function putBlob(name: string, mime: string, body: Buffer) {
   if (!pool) {
     const p = blobPath(name);
     mkdirSync(p.slice(0, p.lastIndexOf('/')), { recursive: true });
-    if (!existsSync(p)) writeFileSync(p, body);
+    try { writeFileSync(p, body, { flag: 'wx' }); }   // 이미 있으면(같은 내용 = 같은 해시 이름) 그대로 둔다
+    catch (e: any) { if (e?.code !== 'EEXIST') throw e; }
     return;
   }
   if (blobNames.has(name)) return;

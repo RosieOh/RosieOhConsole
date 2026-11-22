@@ -233,7 +233,7 @@ createServer((req, res) => {
   const send = (code, body) => {
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(body));
-    console.log(`${code === 200 ? ' ' : '!'} ${req.method} ${u.pathname}${u.search}`);
+    console.log(`${code === 200 ? ' ' : '!'} ${req.method} ${(u.pathname + u.search).replace(/[\u0000-\u001f\u007f]/g, ' ')}`);
   };
   if (!hit) return send(404, { message: `mock: ${req.method} ${path} 응답이 없습니다 — dev/mock-api.mjs 의 ROUTES 에 추가하세요` });
   send(200, hit[2](u));

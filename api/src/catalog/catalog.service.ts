@@ -9,6 +9,7 @@ import { hasBlob, putBlob } from '../persist.js';
 import { DEFAULT_COMPONENTS, DEFAULT_NODES } from './defaults.js';
 import { LOGO_FILE_RE, LOGO_MAX, pickCandidates, prepareLogo } from './logos.js';
 import { UNASSIGNED, buildCatalog, emptyOverrides } from './merge.js';
+import { isSafeKey } from '../safe.js';
 import { CatalogOverrides, KINDS } from './types.js';
 
 export type CatalogOp =
@@ -147,11 +148,12 @@ export class CatalogService implements OnModuleInit, OnModuleDestroy {
               break;
             }
             case 'comp.delete': {
-              if (!compKeys.has(op.key)) throw new BadRequestException('없는 구성요소입니다');
+              if (!isSafeKey(op.key) || !compKeys.has(op.key)) throw new BadRequestException('없는 구성요소입니다');
               if (d.components[op.key]?.added) delete d.components[op.key]; else d.components[op.key] = { ...(d.components[op.key] || {}), deleted: true };
               break;
             }
             case 'reset': {
+              if ((op.node && !isSafeKey(op.node)) || (op.key && !isSafeKey(op.key))) throw new BadRequestException('없는 항목입니다');
               if (op.node) { if (d.nodes[op.node]?.added) throw new BadRequestException('직접 만든 항목은 기본값이 없습니다'); delete d.nodes[op.node]; }
               if (op.key) { if (d.components[op.key]?.added) throw new BadRequestException('직접 만든 항목은 기본값이 없습니다'); delete d.components[op.key]; }
               break;
