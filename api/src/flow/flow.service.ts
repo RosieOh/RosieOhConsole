@@ -6,6 +6,7 @@ import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
 import { RelationsService } from '../relations/relations.service.js';
 import { LaneKind, STAGES, Step, sliceLog, stageOf, tailLog } from './lanes.js';
+import { PipeTarget, Pipeline, pipelineQuery, toPipeline } from './pipelines.js';
 
 // 전체 도식 + 실시간 배포(B·F). 도식은 카탈로그·인프라·연관 관계로 만들고, 실행 중인 배포는 저장소 Actions 를 짧게 돌며 읽는다.
 export interface Track { comp: string; lane: LaneKind; repo: string; workflow: string }
@@ -18,6 +19,8 @@ export interface ActiveRun {
 }
 
 const SLOW_MS = 15000;      // 조용한 저장소
+const PIPE_IDLE_MS = 60_000;   // 배포 흐름: 도는 배포가 없을 때 GitHub 을 다시 보는 간격
+const PIPE_BUSY_MS = 5_000;    //            도는 배포가 있을 때
 const FAST_MS = 3000;       // 실행 중인 저장소
 const RECENT_MS = 15 * 60 * 1000;
 
@@ -173,6 +176,50 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
       return { job: job.name, step: step.name, log: sliceLog(await res.text(), step.started_at, step.completed_at) };
     }
     return { job: null, step: null, log: '' };
+  }
+
+  // ── 배포 흐름(서비스별 파이프라인) ──
+  private pipe: { at: number; pipelines: Pipeline[]; error?: string } | null = null;
+  private pipeLoading: Promise<void> | null = null;
+
+  /** GitHub Deployments 환경이 있는 구성요소 — 카탈로그에서 지운 것은 뺀다 */
+  pipeTargets(): PipeTarget[] {
+    const view = new Map(this.catalog.view().components.map((c) => [c.key, c]));
+    return DEFAULT_COMPONENTS.flatMap((c) => {
+      const env = c.deploy?.prod?.environment;
+      const v = view.get(c.key);
+      if (!env || !v) return [];
+      const repo = full(c.repo); const [owner, repoName] = repo.split('/');
+      return [{ key: c.key, name: v.name, repo, owner, repoName, environment: env, site: c.prod?.link, logo: v.logo ?? null }];
+    });
+  }
+
+  /** 화면은 몇 초마다 부르고, GitHub 은 60초(도는 배포가 있으면 5초)에 한 번 GraphQL 한 번으로 본다 */
+  async pipelines(force = false) {
+    const busy = !!this.pipe?.pipelines.some((p) => p.active);
+    const age = this.pipe ? Date.now() - this.pipe.at : Infinity;
+    const stale = age >= (busy ? PIPE_BUSY_MS : PIPE_IDLE_MS) || (force && age >= PIPE_BUSY_MS);
+    if (stale) {
+      this.pipeLoading ??= this.loadPipelines().finally(() => { this.pipeLoading = null; });
+      await this.pipeLoading;
+    }
+    const p = this.pipe!;
+    return { at: new Date(p.at).toISOString(), pipelines: p.pipelines, error: p.error };
+  }
+
+  private async loadPipelines() {
+    const targets = this.pipeTargets();
+    if (!targets.length) { this.pipe = { at: Date.now(), pipelines: [] }; return; }
+    try {
+      // ghGraphql 은 오류가 하나라도 있으면 던진다 — 저장소 하나가 없어져도 나머지는 보이게 직접 부른다
+      const res = await ghFetch('graphql', { method: 'POST', body: JSON.stringify({ query: pipelineQuery(targets) }) }, undefined, 30000);
+      const j: any = await res.json().catch(() => ({}));
+      if (!res.ok || !j.data) throw new Error(j.errors?.[0]?.message || j.message || `HTTP ${res.status}`);
+      this.pipe = { at: Date.now(), pipelines: targets.map((t, i) => toPipeline(t, j.data[`r${i}`])) };
+    } catch (e: any) {
+      // 못 읽으면 지난 값을 그대로 두고 오류만 알린다(처음이면 빈 목록)
+      this.pipe = { at: Date.now(), pipelines: this.pipe?.pipelines ?? [], error: `GitHub 을 읽지 못했습니다: ${e?.message || e}` };
+    }
   }
 
   /** 전체 도식 — 노드(프로젝트·구성요소·인프라·가상 단계)와 선(배포 갈래·연관 관계) */
