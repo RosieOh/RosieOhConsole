@@ -1,0 +1,41 @@
+# 의존성 자동 업데이트 — 매주 월요일 PR. 작은 업데이트(minor·patch)는 한 PR 로 묶는다.
+# cooldown: 새로 나온 버전은 며칠 지켜본 뒤에 올린다(배포 직후 악성 버전이 섞이는 공급망 공격 대비). 보안 패치는 cooldown 없이 바로 온다
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /api
+    schedule: { interval: weekly, day: monday, time: '09:00', timezone: Asia/Seoul }
+    cooldown: { default-days: 7 }
+    groups:
+      minor-patch: { update-types: [minor, patch] }
+    labels: [chore, api]
+    commit-message: { prefix: 'CHORE :' }
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly, day: monday, time: '09:00', timezone: Asia/Seoul }
+    cooldown: { default-days: 7 }
+    groups:
+      minor-patch: { update-types: [minor, patch] }
+    labels: [chore, web]
+    commit-message: { prefix: 'CHORE :' }
+    open-pull-requests-limit: 5
+
+  # 워크플로의 actions(커밋 SHA 로 고정 — 업데이트 PR 이 SHA 와 버전 주석을 같이 바꾼다)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, time: '09:00', timezone: Asia/Seoul }
+    cooldown: { default-days: 7 }
+    groups:
+      actions: { patterns: ['*'] }
+    labels: [chore]
+    commit-message: { prefix: 'CHORE :' }
+
+  # Dockerfile 의 node 기반 이미지(다이제스트로 고정)
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday, time: '09:00', timezone: Asia/Seoul }
+    cooldown: { default-days: 7 }
+    labels: [chore]
+    commit-message: { prefix: 'CHORE :' }
