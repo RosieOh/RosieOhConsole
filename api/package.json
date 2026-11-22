@@ -16,6 +16,7 @@
     "@nestjs/platform-express": "^12.1.2",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
+    "libsodium-wrappers": "^0.7.16",
     "mariadb": "^3.5.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
     "@types/express": "^5.0.3",
+    "@types/libsodium-wrappers": "^0.7.14",
     "@types/node": "^22.15.0",
     "typescript": "^5.9.3"
   }
