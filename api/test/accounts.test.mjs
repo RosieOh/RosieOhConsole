@@ -161,3 +161,11 @@ test('쓰기 요청 출처 — PUBLIC_URL·ALLOWED_ORIGINS 만, Origin 이 없�
   assert.equal(originOk('http://localhost:5173'), true);
   cfg.allowedOrigins.splice(0, cfg.allowedOrigins.length, ...saved);
 });
+
+test('가입 제한 — 같은 IP 는 1시간에 10번까지 시도', () => {
+  const ip = '198.51.100.7';
+  for (let i = 0; i < 10; i++) assert.equal(code(() => A.signup({ login: '1bad', name: 'x', email: 'r@example.com', password: 'abcdef12' }, ip)), 'bad_login');
+  assert.equal(code(() => A.signup({ login: 'frank', name: 'F', email: 'frank@example.com', password: 'fine-pass-3' }, ip)), 'rate_limited');
+  // 다른 IP 는 그대로
+  assert.equal(A.signup({ login: 'frank', name: 'F', email: 'frank@example.com', password: 'fine-pass-3' }, '198.51.100.8').status, 'pending');
+});

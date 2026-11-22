@@ -2,10 +2,11 @@
 # 실행하고 결과는 실행 로그에 찍지 않고 콘솔(/dashapi/probe/ingest)로만 보낸다. restart 는 콘솔이 이름 확인 뒤 부른다.
 #
 # 부르는 쪽(서버를 맡은 저장소의 .github/workflows/probe.yml) — deploy/probe-caller.yml 을 복사해 쓴다:
-#   uses: RosieOh/RosieOhConsole/.github/workflows/server-probe.yml@main
+#   uses: RosieOh/RosieOhConsole/.github/workflows/server-probe.yml@<커밋 SHA>   (브랜치 말고 SHA 로 고정)
 #   with: { server: <콘솔의 서버 id>, ssh-host: 'user@host', ssh-port: '22', key: PROD, action/target/lines/confirm }
-#   secrets: inherit
-# 필요한 시크릿·변수(부르는 저장소 또는 계정): <KEY>_SSH_KEY, <KEY>_SSH_KNOWN_HOSTS, PROBE_TOKEN(콘솔과 같은 값), 변수 CONSOLE_URL
+#   secrets: { SSH_KEY: ${{ secrets.PROD_SSH_KEY }}, SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}, PROBE_TOKEN: ${{ secrets.PROBE_TOKEN }} }
+# 필요한 시크릿·변수(부르는 저장소 또는 계정): <KEY>_SSH_KEY, <KEY>_SSH_KNOWN_HOSTS(필수), PROBE_TOKEN(콘솔과 같은 값), 변수 CONSOLE_URL
+# 시크릿은 필요한 셋만 이름을 정해 넘긴다. 예전 부르는 쪽의 'secrets: inherit' 도 <KEY>_SSH_KEY 로 찾아 그대로 돈다.
 name: server-probe
 
 on:
@@ -19,6 +20,10 @@ on:
       target:   { type: string, default: '', description: '서비스 이름(logs·restart) — 컨테이너 <target> 또는 <target>-web-*' }
       lines:    { type: string, default: '300' }
       confirm:  { type: string, default: '', description: 'restart 일 때 target 을 그대로' }
+    secrets:
+      SSH_KEY:         { required: false, description: '서버 SSH 개인키(없으면 inherit 로 받은 <KEY>_SSH_KEY)' }
+      SSH_KNOWN_HOSTS: { required: false, description: "서버 호스트 키 — ssh-keyscan -p <포트> <host> 결과(없으면 <KEY>_SSH_KNOWN_HOSTS)" }
+      PROBE_TOKEN:     { required: false, description: '콘솔 .env 의 PROBE_TOKEN 과 같은 값' }
 
 permissions:
   contents: read
@@ -40,13 +45,18 @@ jobs:
 
       - name: SSH 준비
         env:
-          SSH_KEY: ${{ secrets[format('{0}_SSH_KEY', inputs.key)] }}
-          KNOWN: ${{ secrets[format('{0}_SSH_KNOWN_HOSTS', inputs.key)] }}
+          KEY: ${{ inputs.key }}
+          SSH_KEY: ${{ secrets.SSH_KEY || secrets[format('{0}_SSH_KEY', inputs.key)] }}
+          KNOWN: ${{ secrets.SSH_KNOWN_HOSTS || secrets[format('{0}_SSH_KNOWN_HOSTS', inputs.key)] }}
+        # 입력은 env 로만 받는다(run 안에 ${{ }} 를 넣지 않는다 — 스크립트 주입 막기)
         run: |
-          [ -n "$SSH_KEY" ] || { echo "${{ inputs.key }}_SSH_KEY 시크릿이 없습니다" >&2; exit 1; }
+          printf '%s' "$KEY" | grep -Eq '^[A-Z][A-Z0-9_]{0,40}$' || { echo "key 는 대문자·숫자·_ 만" >&2; exit 1; }
+          [ -n "$SSH_KEY" ] || { echo "${KEY}_SSH_KEY 시크릿이 없습니다" >&2; exit 1; }
+          # 호스트 키를 모르면 붙지 않는다 — 처음 본 키를 받아들이면 중간에서 가로챈 서버에 키·명령을 넘길 수 있다
+          [ -n "$KNOWN" ] || { echo "${KEY}_SSH_KNOWN_HOSTS 시크릿이 없습니다 — 'ssh-keyscan -p <포트> <host>' 결과를 넣으세요" >&2; exit 1; }
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_probe && chmod 600 ~/.ssh/id_probe
-          if [ -n "$KNOWN" ]; then printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts; else echo "::warning::${{ inputs.key }}_SSH_KNOWN_HOSTS 가 없어 처음 본 호스트 키를 받아들입니다"; fi
+          printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
 
       - name: 점검(결과는 파일로만 — 로그에 찍지 않는다)
         id: run
@@ -87,7 +97,7 @@ jobs:
           fi
           # mx:collect:end
           COLLECT
-          ssh -i ~/.ssh/id_probe -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new \
+          ssh -i ~/.ssh/id_probe -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes \
             "$HOST" "bash -s -- '$ACTION' '$TARGET' '$LINES'" < /tmp/collect.sh > /tmp/probe.txt 2>/tmp/probe.err
           code=$?
           echo "ok=$([ $code -eq 0 ] && grep -q '^=== mx:meta ===' /tmp/probe.txt && echo 1 || echo 0)" >> "$GITHUB_OUTPUT"
