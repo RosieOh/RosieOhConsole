@@ -23,7 +23,9 @@ COPY .github/workflows/server-probe.yml /.github/workflows/server-probe.yml
 RUN npm run build && npm test
 
 # ── 런타임 (NestJS 가 API + React 빌드 동시 서빙) ───────
-FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS runtime
+# 기반 이미지 이후에 나온 alpine 보안 패치(openssl·zlib 등)를 받는다 — image.yml 은 이 단계를 캐시하지 않아 빌드할 때마다 새로 받는다
+RUN apk upgrade --no-cache
 WORKDIR /app
 ENV NODE_ENV=production TZ=Asia/Seoul
 COPY api/package.json api/package-lock.json ./
@@ -38,4 +40,7 @@ COPY --from=web /web/dist ./public
 RUN mkdir -p /data && chown node:node /data
 USER node
 EXPOSE 8087
+# 컨테이너 상태 — compose 가 따로 정하지 않아도(docker run·다른 오케스트레이터) 헬스를 본다
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:8087/dashapi/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 CMD ["node", "dist/main.js"]
