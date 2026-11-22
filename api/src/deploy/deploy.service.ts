@@ -37,6 +37,20 @@ const RUNS_PER_WORKFLOW = 30;
 const KEEP_VERSIONS = 4;          // Kamal 은 컨테이너 5개(지금 것 + 4)를 남긴다
 const ENVS: EnvKey[] = ['testbed', 'prod'];
 
+/**
+ * GitHub 배포 기록 하나 → 배포 줄. 상태: success·inactive(다음 배포로 밀려남, 그때는 성공) → success,
+ * failure·error → failure, 나머지(queued·pending·in_progress)·상태 없음 → running
+ */
+export function toDeploymentRun(d: any, st: any, environment: string, repoWeb: string): DeployRun {
+  const state = !st ? 'running' : ['success', 'inactive'].includes(st.state) ? 'success' : ['failure', 'error'].includes(st.state) ? 'failure' : 'running';
+  const sha = String(d.sha || '').slice(0, 12);
+  return {
+    id: d.id, number: d.id, url: st?.log_url || st?.target_url || st?.environment_url || `${repoWeb}/deployments`,
+    workflow: environment, branch: String(d.ref || ''), sha, event: 'deployment', actor: d.creator?.login || '',
+    at: d.created_at || '', ended: state === 'running' ? null : (st?.created_at || null), state, action: 'deploy', version: sha || null,
+  };
+}
+
 @Injectable()
 export class DeployService {
   private readonly registry: ServiceDef[];
@@ -113,7 +127,33 @@ export class DeployService {
     return n > 1;
   }
 
+  // ── GitHub Deployments 트랙(Pages·Vercel) — 환경의 배포 기록과 각 배포의 마지막 상태 ──
+  private readonly depStatus = new Map<number, any>();   // 끝난 상태(success·failure·error·inactive)는 바뀌지 않아 기억한다
+  private async deploymentsTrack(s: ServiceDef, env: EnvKey, t: DeployTrack, force: boolean): Promise<TrackView> {
+    const k = `${s.repo}@${t.environment}`;
+    const hit = this.runs.get(k);
+    const list: any[] = !force && hit && Date.now() - hit.at < RUNS_TTL_MS ? hit.list
+      : (await this.json(`repos/${full(s.repo)}/deployments?environment=${encodeURIComponent(t.environment!)}&per_page=${RUNS_PER_WORKFLOW}`)) || [];
+    this.runs.set(k, { at: Date.now(), list });
+    const runs: DeployRun[] = [];
+    for (const d of list) {
+      let st = this.depStatus.get(d.id);
+      if (!st) {
+        st = ((await this.json(`repos/${full(s.repo)}/deployments/${d.id}/statuses?per_page=1`).catch(() => null)) || [])[0] ?? null;
+        if (st && ['success', 'failure', 'error', 'inactive'].includes(st.state)) this.depStatus.set(d.id, st);
+      }
+      runs.push(toDeploymentRun(d, st, t.environment!, repoUrl(s.repo)));
+    }
+    const running = runs.filter((r) => r.state === 'running');
+    const entries = runs.filter((r) => r.state !== 'running');
+    return {
+      env, kamal: '', dest: t.environment!, current: entries.find((e) => e.state === 'success') ?? null, last: entries[0] ?? null,
+      running, history: entries.slice(0, 10), all: entries, candidates: [], floor: null, blocked: {}, rollback: null,
+    };
+  }
+
   private async track(s: ServiceDef, env: EnvKey, t: DeployTrack, force: boolean): Promise<TrackView> {
+    if (t.environment) return this.deploymentsTrack(s, env, t, force);
     const all = (await Promise.all(t.workflows.map((wf) => this.runsOf(s.repo, wf, force)))).flat().sort((a, b) => b.id - a.id);
     const running: DeployRun[] = [];
     const entries: DeployRun[] = [];

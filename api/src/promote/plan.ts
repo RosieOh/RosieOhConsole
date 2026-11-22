@@ -15,6 +15,7 @@ export interface Plan {
 
 export function planOf(c: ComponentDef): Plan | null {
   const prod = c.deploy?.prod;
+  if (prod?.environment) return null;   // Pages·Vercel — 기본 브랜치 push 가 곧 배포, 콘솔이 올릴 일이 없다
   if (prod) {
     const kamalProd = prod.workflows.includes('kamal-prod.yml');
     const extra = Object.fromEntries(Object.entries(prod.rollback?.inputs ?? {}).filter(([k]) => !['action', 'confirm', 'version'].includes(k)));
