@@ -1,0 +1,5 @@
+# 콘솔 앞 HTTPS — 도메인의 A 레코드가 이 서버를 가리키면 Caddy 가 인증서를 알아서 받는다
+{$CONSOLE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy console:8087
+}

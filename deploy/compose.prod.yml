@@ -1,0 +1,56 @@
+# 운영 실행 예시 — GHCR 이미지 + MariaDB + Caddy(자동 HTTPS). 서버의 이 폴더에 .env 와 Caddyfile 을 두고:
+#   docker compose -f compose.prod.yml pull && docker compose -f compose.prod.yml up -d
+# .env 에 꼭: CONSOLE_DOMAIN, PUBLIC_URL(https://<CONSOLE_DOMAIN>), OAUTH_CLIENT_ID·SECRET, SESSION_SECRET, MARIADB_PASSWORD, MARIADB_ROOT_PASSWORD
+# GitHub OAuth 앱 콜백: https://<CONSOLE_DOMAIN>/dashapi/oauth/callback
+# 버전 고정: CONSOLE_IMAGE=ghcr.io/rosieoh/rosieohconsole:<커밋 12자> (기본 latest)
+services:
+  console:
+    image: ${CONSOLE_IMAGE:-ghcr.io/rosieoh/rosieohconsole:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: mariadb://console:${MARIADB_PASSWORD}@mariadb:3306/console
+      DATA_DIR: /data
+    volumes:
+      - console-data:/data          # 옛 파일 옮겨 오기·로고(파일 모드) 자리. MariaDB 모드에서도 둔다
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8087/dashapi/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: console
+      MARIADB_USER: console
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:?MARIADB_PASSWORD 를 .env 에}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?MARIADB_ROOT_PASSWORD 를 .env 에}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      CONSOLE_DOMAIN: ${CONSOLE_DOMAIN:?CONSOLE_DOMAIN 을 .env 에}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [console]
+
+volumes:
+  console-data:
+  mariadb-data:
+  caddy-data:

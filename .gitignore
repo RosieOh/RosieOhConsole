@@ -13,3 +13,5 @@ api/docs/*.md.bak
 data/
 web/tsconfig.tsbuildinfo
 api/public/
+backups/
+deploy/.env
