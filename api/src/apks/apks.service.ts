@@ -8,6 +8,7 @@ import { ApkKind, hasReleases } from './apps.js';
 import { Change, normVersion, splitVersions, summarize } from './changes.js';
 import { Status, VerState, currentKnox, knoxStore, statusOf } from './knox.js';
 import { SHIPPED, Shipped, cleanShipped, mergeVersions, prevShipped, shippedStore, upsertShipped, windowCommits } from './shipped.js';
+import { isSafeKey } from '../safe.js';
 import { audit } from '../audit.js';
 
 export interface ApkAsset { id: number; name: string; size: number; downloads: number }
@@ -96,6 +97,7 @@ export class ApksService {
 
   // ── 녹스·다운로드·메모 ──
   recordDownload(repo: string, tag: string, who: string) {
+    if (!isSafeKey(repo) || !isSafeKey(tag)) return;
     this.knox.update(undefined, (d) => {
       const app = (d.apps[repo] ||= { versions: {}, history: [] });
       const v = (app.versions[tag] ||= { downloads: 0 });
@@ -104,6 +106,7 @@ export class ApksService {
   }
 
   async markKnox(repo: string, tag: string, by: string, undo: boolean) {
+    if (!isSafeKey(repo) || !isSafeKey(tag)) throw new Error('없는 앱, 버전입니다');
     const r = (await this.list()).find((x) => x.repo === repo);
     if (!r || !r.releases.some((x) => x.tag === tag)) throw new Error('없는 앱, 버전입니다');
     this.knox.update(undefined, (d) => {
@@ -117,6 +120,7 @@ export class ApksService {
   }
 
   async setNote(repo: string, tag: string, text: string, by: string) {
+    if (!isSafeKey(repo) || !isSafeKey(tag)) throw new Error('없는 앱, 버전입니다');
     const r = (await this.list()).find((x) => x.repo === repo);
     if (!r || !r.releases.some((x) => x.tag === tag)) throw new Error('없는 앱, 버전입니다');
     this.knox.update(undefined, (d) => {
@@ -218,6 +222,7 @@ export class ApksService {
 
   /** from 이 있으면 그 기록을 고치고, 없으면 새로 넣는다. rec 가 null 이면 from 을 지운다 */
   async saveShipped(repo: string, from: string | null, input: any | null, by: string, rev?: number) {
+    if (!isSafeKey(repo)) throw new Error('없는 앱입니다');
     if (!(await this.list()).some((x) => x.repo === repo && hasReleases(x.kind))) throw new Error('없는 앱입니다');
     const rec = input ? { ...cleanShipped(input), by, updatedAt: new Date().toISOString() } : null;
     if (!rec && !from) throw new Error('지울 버전이 없습니다');

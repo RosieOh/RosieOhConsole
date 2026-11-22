@@ -10,7 +10,7 @@ test('index.html 의 src 없는 스크립트만 해시로', () => {
   const html = `<script>${body}</script><script type="module" src="/a.js"></script><script> </script>`;
   const want = `'sha256-${createHash('sha256').update(body).digest('base64')}'`;
   assert.deepEqual(inlineScriptHashes(html), [want]);
-  assert.match(contentSecurityPolicy([want]), new RegExp(`script-src 'self' ${want.replace(/[+/]/g, '\\$&')}`));
+  assert.ok(contentSecurityPolicy([want]).includes(`script-src 'self' ${want}`));
 });
 
 test('헤더 — frame-ancestors none, X-Frame-Options, https 일 때만 HSTS', () => {

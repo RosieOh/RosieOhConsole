@@ -8,6 +8,7 @@ import { DeployService } from '../deploy/deploy.service.js';
 import { ghFetch, ghJson } from '../github.js';
 import { JsonStore, RevConflict, Versioned } from '../json-store.js';
 import { StatusService } from '../status.service.js';
+import { isSafeKey } from '../safe.js';
 import { Plan, checkAt, issueRefs, planOf } from './plan.js';
 
 // 운영 승격·예약(B) — 테스트배드에서 지켜본 버전을 정한 시각에 운영으로.
@@ -122,6 +123,7 @@ export class PromoteService implements OnModuleInit, OnModuleDestroy {
   }
 
   async cancel(login: string, id: string) {
+    if (!isSafeKey(id) || !Object.hasOwn(this.store.get().items, id)) throw new NotFoundException();
     const s = this.store.get().items[id];
     if (!s) throw new NotFoundException();
     if (s.state !== 'scheduled') throw new ConflictException('이미 시작했거나 끝난 예약은 취소할 수 없습니다');

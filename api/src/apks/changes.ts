@@ -22,7 +22,7 @@ export function parseMessage(msg: string, sha = ''): Change | null {
   line = line.replace(/^(#\d+\s+)+/, '').replace(/^\[[^\]]+\]\s*/, '');
   const t = line.match(TYPE_RE)?.[1]?.toLowerCase();
   if (t === 'chore' || t === 'ci' || t === 'build' || t === 'docs' || t === 'test' || t === 'style') return null;
-  if (/^(버전|version)\b|versionName|versionCode/i.test(line.replace(TYPE_RE, ''))) return null;
+  if (/(^(버전|version)\b)|versionName|versionCode/i.test(line.replace(TYPE_RE, ''))) return null;
   line = line.replace(TYPE_RE, '');
   line = line.replace(/\s*\+?\s*v?\d+\.\d+(\.\d+)?\s*\((vc)?\d+\)\s*$/i, '').replace(/\s*\((vc)?\d{3,}\)\s*$/i, '');
   const [title, ...rest] = line.split(/\s—\s/);

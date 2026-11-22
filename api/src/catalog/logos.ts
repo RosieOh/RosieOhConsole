@@ -38,20 +38,34 @@ export function pickCandidates(paths: string[], max = 12): string[] {
 export function sniff(buf: Buffer): LogoExt | null {
   if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
   if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
-  const head = buf.toString('utf8', 0, Math.min(buf.length, 1024)).replace(/^﻿/, '').trimStart();
-  if (/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE svg[^>]*>\s*)?<svg[\s>]/i.test(head)) return 'svg';
-  return null;
+  // 앞머리(<?xml?>, 주석, DOCTYPE)를 하나씩 걷어 내고 <svg 로 시작하는지 본다 — 반복이 겹친 정규식은 느린 입력에 약해(ReDoS) 쓰지 않는다
+  let head = buf.toString('utf8', 0, Math.min(buf.length, 1024)).replace(/^\uFEFF/, '').trimStart();
+  for (let i = 0; i < 20; i++) {
+    if (head.startsWith('<?xml')) { const e = head.indexOf('?>'); if (e < 0) return null; head = head.slice(e + 2).trimStart(); continue; }
+    if (head.startsWith('<!--')) { const e = head.indexOf('-->', 4); if (e < 0) return null; head = head.slice(e + 3).trimStart(); continue; }
+    if (/^<!DOCTYPE svg/i.test(head)) { const e = head.indexOf('>'); if (e < 0) return null; head = head.slice(e + 1).trimStart(); continue; }
+    break;
+  }
+  return /^<svg[\s>]/i.test(head) ? 'svg' : null;
 }
 
-/** SVG 정리 — 그림으로만 쓰이게 스크립트·외부 개체·이벤트 속성·javascript: 링크를 지운다(내려줄 때 CSP sandbox 도 건다) */
+const svgPass = (svg: string) => svg
+  .replace(/<!DOCTYPE[^>[]*(\[[^\]]*\])?>/gi, '')
+  .replace(/<script\b[\s\S]*?<\/script[^>]*>/gi, '').replace(/<script\b[^>]*>/gi, '')
+  .replace(/<foreignObject\b[\s\S]*?<\/foreignObject[^>]*>/gi, '').replace(/<foreignObject\b[^>]*>/gi, '')
+  .replace(/[\s/]on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, ' ')
+  .replace(/(href|xlink:href)\s*=\s*("\s*javascript:[^"]*"|'\s*javascript:[^']*')/gi, '$1="#"')
+  .replace(/(href|xlink:href)\s*=\s*("\s*https?:[^"]*"|'\s*https?:[^']*')/gi, '$1="#"');   // 바깥 자원 불러오기 금지
+/** 지우고 나서도 남아 있으면 안 되는 것 */
+const SVG_DANGER = /<script|<foreignObject|[\s/]on[a-z]+\s*=|javascript:|<!ENTITY/i;
+
+/** SVG 정리 — 그림으로만 쓰이게 스크립트·외부 개체·이벤트 속성·javascript: 링크를 지운다(내려줄 때 CSP sandbox 도 건다).
+ *  지우면서 새로 이어 붙는 조각(예: <scr<script>ipt>)까지 없어질 때까지 되풀이하고, 그래도 남으면 거절한다 */
 export function sanitizeSvg(svg: string): string {
-  return svg
-    .replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?>/gi, '')
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, '').replace(/<script[^>]*\/>/gi, '')
-    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, '')
-    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/(href|xlink:href)\s*=\s*("\s*javascript:[^"]*"|'\s*javascript:[^']*')/gi, '$1="#"')
-    .replace(/(href|xlink:href)\s*=\s*("\s*https?:[^"]*"|'\s*https?:[^']*')/gi, '$1="#"');   // 바깥 자원 불러오기 금지
+  let out = svg;
+  for (let i = 0; i < 10; i++) { const next = svgPass(out); if (next === out) break; out = next; }
+  if (SVG_DANGER.test(out)) throw new Error('SVG 에 스크립트·이벤트 속성이 남아 있어 올릴 수 없습니다');
+  return out;
 }
 
 /** 검사·정리한 로고와 저장할 파일 이름 */

@@ -7,6 +7,7 @@ import { ghJson, ghRaw } from '../github.js';
 import { DEFAULT_INFRA, InfraKind, SCAN_PATHS } from '../infra/defaults.js';
 import { infraName } from '../infra/names.js';
 import { JsonStore, RevConflict, Versioned } from '../json-store.js';
+import { isSafeKey } from '../safe.js';
 import { Clue, Known, extractClues, hostOf, matchClues, wantFile } from './scan.js';
 
 // 연관 관계(A2) — 저장소 설정 파일에서 자동으로 찾고(/data/relations-scan.json), 사람이 확정·거절·추가(/data/relations.json)
@@ -195,7 +196,7 @@ export class RelationsService implements OnModuleInit, OnModuleDestroy {
         const now = { by: login, at: new Date().toISOString() };
         switch (b.op) {
           case 'confirm': case 'reject': case 'reset': {
-            if (!b.id || !g.edges.some((e) => e.id === b.id)) throw new BadRequestException('없는 연결입니다');
+            if (!isSafeKey(b.id) || !g.edges.some((e) => e.id === b.id)) throw new BadRequestException('없는 연결입니다');
             delete d.confirmed[b.id]; delete d.rejected[b.id];
             if (b.op === 'confirm') d.confirmed[b.id] = now;
             if (b.op === 'reject') d.rejected[b.id] = now;
@@ -205,23 +206,25 @@ export class RelationsService implements OnModuleInit, OnModuleDestroy {
             if (!b.from || !b.to || !ID_RE.test(b.from) || !ID_RE.test(b.to) || b.from === b.to) throw new BadRequestException('연결 양 끝이 올바르지 않습니다');
             const ok = (id: string) => id.startsWith('comp:') ? this.catalog.view().components.some((c) => `comp:${c.key}` === id) : g.nodes.some((n) => n.id === id) || /^(db|redis|ext):/.test(id);
             if (!ok(b.from) || !ok(b.to)) throw new BadRequestException('없는 서비스, 인프라입니다');
-            d.manual[edgeId(b.from, b.to)] = { from: b.from, to: b.to, note: b.note ? String(b.note).slice(0, 200) : undefined, ...now };
+            const id = edgeId(b.from, b.to);
+            if (!isSafeKey(id)) throw new BadRequestException('연결 양 끝이 올바르지 않습니다');
+            d.manual[id] = { from: b.from, to: b.to, note: b.note ? String(b.note).slice(0, 200) : undefined, ...now };
             break;
           }
           case 'remove': {
-            if (!b.id || !d.manual[b.id]) throw new BadRequestException('직접 추가한 연결만 지울 수 있습니다');
+            if (!isSafeKey(b.id) || !Object.hasOwn(d.manual, b.id)) throw new BadRequestException('직접 추가한 연결만 지울 수 있습니다');
             delete d.manual[b.id];
             break;
           }
           case 'name': {
-            if (!b.id || !ID_RE.test(b.id) || b.id.startsWith('comp:')) throw new BadRequestException('이름을 바꿀 수 없는 항목입니다(서비스 이름은 카탈로그에서)');
+            if (!isSafeKey(b.id) || !ID_RE.test(b.id) || b.id.startsWith('comp:')) throw new BadRequestException('이름을 바꿀 수 없는 항목입니다(서비스 이름은 카탈로그에서)');
             const name = String(b.name ?? '').trim();
             if (!name) delete d.names[b.id]; else if (name.length > 60) throw new BadRequestException('이름은 60자까지'); else d.names[b.id] = name;
             break;
           }
           case 'host': {
             const host = String(b.host ?? '').toLowerCase();
-            if (!/^[a-z0-9.-]{3,200}$/.test(host)) throw new BadRequestException('호스트가 올바르지 않습니다');
+            if (!/^[a-z0-9.-]{3,200}$/.test(host) || !isSafeKey(host)) throw new BadRequestException('호스트가 올바르지 않습니다');
             const name = String(b.name ?? '').trim();
             if (!name) delete d.hosts[host]; else d.hosts[host] = name.slice(0, 60);
             break;

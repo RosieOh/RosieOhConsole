@@ -7,6 +7,7 @@ import { cfg, repoUrl, full } from '../config.js';
 import { ghFetch, ghJson } from '../github.js';
 import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { addrOf } from '../infra/names.js';
+import { logSafe } from '../safe.js';
 import { ProbeResult, alertsOf, parseProbe } from './parse.js';
 
 // 서버(D) — 점검 결과 받기·보관·요청. 로그는 메모리에만(디스크·GitHub 에 남기지 않는다)
@@ -78,7 +79,7 @@ export class ServersService {
     }
     this.pending.delete(`${def.id}:${q.action}`);
     this.save();
-    if (!process.env.NODE_TEST_CONTEXT) console.log(`[서버] ${def.id} ${q.action} 결과 ${p ? '받음' : '접속 실패'}`);
+    if (!process.env.NODE_TEST_CONTEXT) console.log(`[서버] ${def.id} ${logSafe(q.action, 20)} 결과 ${p ? '받음' : '접속 실패'}`);
     return { ok: true };
   }
 

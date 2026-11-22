@@ -15,7 +15,7 @@ export const STAGES: Record<LaneKind, StageDef[]> = {
     { id: 'trigger', label: 'main 머지, 운영 실행' },
     { id: 'prepare', label: '준비, 환경변수', re: /입력 확인|SSH|환경변수|서버 준비|Firebase|^테스트$/ },
     { id: 'build', label: '이미지 빌드', re: /pre-build|Java|bootJar|docker CLI/ },
-    { id: 'deploy', label: 'Kamal 교체', re: /^Kamal|nginx|서버 설정/ },
+    { id: 'deploy', label: 'Kamal 교체', re: /(^Kamal)|nginx|서버 설정/ },
     { id: 'verify', label: '바깥 확인, 60초 감시', re: /바깥|외부|감시|상태 남기기|로그아웃/ },
   ],
   apk: [
