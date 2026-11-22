@@ -1,9 +1,15 @@
 # 로컬 실행 — MariaDB + 콘솔.
 #   docker compose up -d mariadb          DB 만(npm run dev 로 콘솔을 띄울 때, DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console)
 #   docker compose up -d --build          둘 다(.env 에 OAuth·세션 값 필요)
+# 한 번 띄우면 Docker Desktop 이 켜질 때마다 다시 뜬다(restart). 맥을 켜면 Docker Desktop 도 뜨게: 설정 › General › Start Docker Desktop when you sign in
+# 프로젝트 이름을 고정해 둔다 — 저장소 폴더 이름이 달라도(새 컴퓨터에서 RosieOhConsole 로 받아도) 같은 볼륨 이름(mx-console_mariadb-data)
+# 다른 컴퓨터로 옮기기: scripts/migrate.bash export → import
+name: mx-console
+
 services:
   mariadb:
     image: mariadb:11.4
+    restart: unless-stopped
     environment:
       MARIADB_DATABASE: console
       MARIADB_USER: console
@@ -22,6 +28,7 @@ services:
 
   console:
     build: .
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: mariadb://console:${MARIADB_PASSWORD:-console}@mariadb:3306/console
