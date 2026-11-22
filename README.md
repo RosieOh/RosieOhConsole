@@ -61,6 +61,17 @@ DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console   # .env 에
 TEST_DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console npm --prefix api test   # MariaDB 시험까지
 ```
 
+MariaDB 는 한 번 띄우면 Docker Desktop 이 켜질 때마다 다시 뜬다(`restart: unless-stopped`). 맥을 켤 때 Docker Desktop 도 뜨게 하려면 Docker Desktop 설정 › General › **Start Docker Desktop when you sign in**.
+
+다른 컴퓨터로 옮기기:
+```
+scripts/migrate.bash export                 # 지금 컴퓨터 — backups/rosie-console-move-<시각>.tar.gz (DB·.env·data/, 비밀값 포함)
+# 새 컴퓨터: Docker Desktop·Node 22·git 설치 후
+git clone https://github.com/RosieOh/RosieOhConsole.git && cd RosieOhConsole
+scripts/migrate.bash import <파일>          # .env·data/ 넣고 MariaDB 되살리기, npm ci
+scripts/dev.bash
+```
+
 만들기 스크립트(`scripts/README.md`): `new-feature`·`new-api`·`new-page`(기능 한 벌), `new-app`(카탈로그 항목), `new-server`(점검할 서버), `db-backup`.
 
 ## 배포
