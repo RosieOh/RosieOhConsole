@@ -10,6 +10,7 @@
 | `new-api.bash <이름>` | `api/src/<이름>/`(controller·service·model) + `api/test/<이름>.test.mjs` + `app.module.ts` 등록 |
 | `new-page.bash <이름> --title 제목` | `web/src/components/<Pascal>.tsx` + `api.ts` 함수·타입 + `App.tsx` 메뉴·라우팅 + 가짜 API 응답 |
 | `new-app.bash <key> --name 이름 --kind 종류 --group 그룹` | 카탈로그(`api/src/catalog/defaults.ts`)에 애플리케이션 추가. `--create-repo` 면 GitHub 저장소도 |
+| `new-server.bash <id> --name 이름 --repo 저장소 --ssh user@host` | 점검할 서버를 `api/src/infra/defaults.ts` 에 등록하고, 그 저장소에 넣을 `probe.yml`(재사용 워크플로 `server-probe.yml` 호출)을 만든다 |
 
 공통 옵션
 - `--guard none|deployer|admin` — API 권한. admin 이면 메뉴도 관리자에게만 보인다
