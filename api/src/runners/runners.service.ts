@@ -32,7 +32,8 @@ const RUNS_PER_REPO = 5;
 // GitHub 호스티드 러너 라벨 — 목록에 안 나오지만 GitHub 이 받아 준다(받을 러너 없음 경고에서 뺀다)
 const HOSTED = /^(ubuntu|windows|macos)-/i;
 const hosted = (labels: string[]) => labels.length > 0 && labels.every((l) => HOSTED.test(l));
-const POLL_MS = 60 * 1000;
+const POLL_MS = 2 * 60 * 1000;          // 러너가 있는 저장소만 — 켜짐·꺼짐 기록
+const DISCOVER_MS = 30 * 60 * 1000;     // 모든 저장소를 훑어 러너가 있는 저장소를 다시 찾는 간격
 const QUEUE_WARN_SEC = 10 * 60;
 
 async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
@@ -91,10 +92,17 @@ export class RunnersService implements OnModuleInit, OnModuleDestroy {
       .sort((a, b) => String(b.pushed_at || '').localeCompare(String(a.pushed_at || '')));
   }
 
-  // 셀프 호스티드 러너 — GitHub 사용자 계정엔 계정 단위 러너가 없어 저장소마다 읽는다(토큰에 Administration read 가 있어야 보인다)
-  private async runnerList(): Promise<{ source: 'repo'; list: any[] }> {
-    const repos = await this.liveRepos();
-    const lists = await pool(repos, 6, (r: any) => ghJson<any>(`repos/${full(r.name)}/actions/runners?per_page=100`).catch(() => null));
+  // 셀프 호스티드 러너 — GitHub 사용자 계정엔 계정 단위 러너가 없어 저장소마다 읽는다(토큰에 Administration read 가 있어야 보인다).
+  // 저장소가 100개를 넘으면 매번 다 묻는 것만으로 시간당 한도를 다 쓴다 — 30분마다(또는 새로 고침) 전체를 훑어
+  // 러너가 있는 저장소를 기억하고, 그 사이에는 그 저장소들만 묻는다
+  private runnerRepos: string[] | null = null;
+  private discoveredAt = 0;
+  private async runnerList(force = false): Promise<{ source: 'repo'; list: any[] }> {
+    const discover = force || !this.runnerRepos || Date.now() - this.discoveredAt > DISCOVER_MS;
+    const repos: string[] = discover ? (await this.liveRepos()).map((r: any) => String(r.name)) : this.runnerRepos!;
+    const lists = await pool(repos, 6, (name: string) => ghJson<any>(`repos/${full(name)}/actions/runners?per_page=100`).catch(() => null));
+    // 한도 초과 등으로 다 실패했으면 기억하지 않는다(빈 목록으로 30분을 보내지 않게)
+    if (discover && lists.some((j) => j)) { this.runnerRepos = repos.filter((_, i) => (lists[i]?.runners || []).length); this.discoveredAt = Date.now(); }
     const byId = new Map<number, any>();
     for (const j of lists) for (const r of j?.runners || []) byId.set(r.id, r);
     return { source: 'repo', list: [...byId.values()] };
@@ -173,7 +181,7 @@ export class RunnersService implements OnModuleInit, OnModuleDestroy {
   private async build(force: boolean): Promise<RunnersView> {
     await this.loadHistory();
     try {
-      const [{ source, list }, rawUses, jobs] = await Promise.all([this.runnerList(), this.scanUses(force).catch(() => this.scan?.uses ?? []), this.recentJobs().catch(() => [] as JobLite[])]);
+      const [{ source, list }, rawUses, jobs] = await Promise.all([this.runnerList(force), this.scanUses(force).catch(() => this.scan?.uses ?? []), this.recentJobs().catch(() => [] as JobLite[])]);
       const comps = this.catalog.view().components;
       const withComps = (u: Omit<Usage, 'components'>): Usage => ({
         ...u, components: comps.filter((c) => c.repo === u.repo).map((c) => ({ key: c.key, name: c.name, logo: c.logo })),
