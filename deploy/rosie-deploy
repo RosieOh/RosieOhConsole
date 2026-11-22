@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# 운영 서버의 반영 문지기 — /usr/local/bin/rosie-deploy (scripts/oracle-setup.bash 가 설치)
+# deploy 사용자의 authorized_keys 에서 command= 로만 불린다. 받는 명령은 'deploy <커밋>' 하나:
+#   origin/main 에 있는 커밋인지 확인 → 저장소를 그 커밋으로 → 그 커밋의 scripts/server-deploy.bash 실행
+# 키가 새어도 할 수 있는 일은 "main 에 이미 있는 커밋을 반영"뿐이다
+set -euo pipefail
+REPO_DIR="${ROSIE_REPO_DIR:-/opt/rosie-console}"
+
+read -r cmd sha extra <<<"${SSH_ORIGINAL_COMMAND:-}" || true
+if [ "${cmd:-}" != deploy ] || [ -n "${extra:-}" ] || ! [[ "${sha:-}" =~ ^[0-9a-f]{12,40}$ ]]; then
+  echo "허용하지 않는 명령입니다 — 'deploy <커밋 12~40자>' 만 받습니다" >&2; exit 2
+fi
+
+exec 9>"${TMPDIR:-/tmp}/rosie-deploy.lock"
+flock -n 9 || { echo "다른 반영이 진행 중입니다" >&2; exit 3; }
+
+cd "$REPO_DIR"
+git fetch -q origin main
+full="$(git rev-parse --verify -q "${sha}^{commit}")" || { echo "없는 커밋: $sha" >&2; exit 4; }
+git merge-base --is-ancestor "$full" origin/main || { echo "main 에 없는 커밋: $sha" >&2; exit 4; }
+git checkout -q --detach "$full"
+echo "▸ 저장소 $(git log -1 --format='%h %s')"
+exec "$REPO_DIR/scripts/server-deploy.bash" "$full"

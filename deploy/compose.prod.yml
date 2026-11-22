@@ -1,8 +1,11 @@
-# 운영 실행 예시 — GHCR 이미지 + MariaDB + Caddy(자동 HTTPS). 서버의 이 폴더에 .env 와 Caddyfile 을 두고:
-#   docker compose -f compose.prod.yml pull && docker compose -f compose.prod.yml up -d
+# 운영 실행 — GHCR 이미지 + MariaDB + Caddy(자동 HTTPS). 서버의 /opt/rosie-console(저장소 clone)의 이 폴더에 .env 를 두고 돈다
+#   처음 준비: scripts/oracle-setup.bash, 반영: deploy 워크플로 → scripts/server-deploy.bash (deploy/README.md)
+#   손으로: docker compose -f compose.prod.yml up -d
 # .env 에 꼭: CONSOLE_DOMAIN, PUBLIC_URL(https://<CONSOLE_DOMAIN>), OAUTH_CLIENT_ID·SECRET, SESSION_SECRET, MARIADB_PASSWORD, MARIADB_ROOT_PASSWORD
 # GitHub OAuth 앱 콜백: https://<CONSOLE_DOMAIN>/dashapi/oauth/callback
 # 버전 고정: CONSOLE_IMAGE=ghcr.io/rosieoh/rosieohconsole:<커밋 12자> (기본 latest)
+name: rosie-console
+
 services:
   console:
     image: ${CONSOLE_IMAGE:-ghcr.io/rosieoh/rosieohconsole:latest}
