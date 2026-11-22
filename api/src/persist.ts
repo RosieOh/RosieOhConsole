@@ -84,7 +84,7 @@ export async function initPersist(url = process.env.DATABASE_URL) {
     }
     const blobs: { name: string }[] = await conn.query('SELECT name FROM blob_file');
     for (const b of blobs) blobNames.add(b.name);
-    console.log(`[저장] MariaDB, 문서 ${rows.length}개, 파일 ${blobs.length}개`);
+    if (!process.env.NODE_TEST_CONTEXT) console.log(`[저장] MariaDB, 문서 ${rows.length}개, 파일 ${blobs.length}개`);
   } finally { conn.release(); }
 }
 
@@ -99,7 +99,7 @@ export function readDoc<T = any>(name: string, file = fileOf(name)): T | null {
     const hit = docs.get(name);
     if (hit) return hit.value as T;
     const legacy = readFileDoc<T>(file);
-    if (legacy !== null) { writeDoc(name, legacy, (legacy as any)?.rev ?? 0); console.log(`[저장] ${file} → MariaDB store.${name}`); }
+    if (legacy !== null) { writeDoc(name, legacy, (legacy as any)?.rev ?? 0); if (!process.env.NODE_TEST_CONTEXT) console.log(`[저장] ${file} → MariaDB store.${name}`); }
     return legacy;
   }
   return readFileDoc<T>(file);

@@ -5,7 +5,9 @@ export interface AuditEntry { at: string; login: string; action: string; target:
 
 export async function audit(e: Omit<AuditEntry, 'at'>) {
   const entry = { at: new Date().toISOString(), ...e };
-  console.log(`[감사] ${JSON.stringify(entry)}`);
+  // node --test 의 자식 프로세스(NODE_TEST_CONTEXT)에서는 찍지 않는다 — Node 22 는 시험 결과를 stdout 으로 직렬화해 보내는데,
+  // 그 사이에 한글 로그가 섞이면 부모가 'Unable to deserialize cloned data' 로 깨진다(CI 에서 간헐적으로 실패)
+  if (!process.env.NODE_TEST_CONTEXT) console.log(`[감사] ${JSON.stringify(entry)}`);
   try { await appendAudit(entry); }
   catch (err: any) { console.warn('[감사] 저장하지 못했다:', err?.message); }
 }

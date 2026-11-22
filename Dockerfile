@@ -16,6 +16,8 @@ WORKDIR /api
 COPY api/package.json api/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY api/ ./
+# 서버 점검 수집기 시험(probe-collector.test.mjs)이 워크플로 안의 수집기를 읽는다
+COPY .github/workflows/server-probe.yml /.github/workflows/server-probe.yml
 RUN npm run build && npm test
 
 # ── 런타임 (NestJS 가 API + React 빌드 동시 서빙) ───────
