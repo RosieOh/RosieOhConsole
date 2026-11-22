@@ -63,8 +63,7 @@ export async function ghFetch(path: string, init: RequestInit = {}, token = cfg.
   const hit = cacheable ? etags.get(key) : undefined;
   if (hit) headers['If-None-Match'] = hit.etag;
 
-  // 주소는 fetch 안에서 ghUrl 로 바로 만든다 — 변수에 담아 넘기면 CodeQL 이 ghUrl 의 검사(API 밖 거절)를 따라가지 못해 SSRF 로 본다
-  const res = await fetch(ghUrl(path), { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
+  const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
   note(path, res);
   if (!cacheable) return res;
   if (res.status === 304 && hit) {
