@@ -179,6 +179,19 @@ const ROUTES = [
     },
   })],
   ['GET', /^\/flow\/live$/, () => ({ at: iso(0), runs: [] })],
+  // 배포 흐름(서비스별 파이프라인) — 진행 중 하나, 실패 하나, 나머지는 끝난 배포
+  ['GET', /^\/flow\/pipelines/, () => {
+    const st = (state, title, detail, minsAgo, endMins) => ({ state, title, detail, url: '#', at: minsAgo == null ? null : iso(minsAgo), endedAt: endMins == null ? null : iso(endMins) });
+    const hist = (n, base) => Array.from({ length: n }, (_, i) => ({ id: base + i, sha: (base + i).toString(16).slice(-7).padStart(7, 'a'), message: ['글 추가', '스타일 손질', '지도 수정', 'README 갱신', '의존성 올림'][i % 5], state: 'done', at: iso(60 * 24 * (i + 1)), endedAt: iso(60 * 24 * (i + 1) - 1), url: '#' }));
+    const p = (key, name, repo, provider, environment, stages, extra = {}) => ({ key, name, repo: `RosieOh/${repo}`, logo: null, provider, environment, site: `https://rosieoh.github.io/${repo}/`, active: false, stages, history: hist(4, key.length * 1000), lastDeployAt: iso(60 * 3), ...extra });
+    return { at: iso(0), pipelines: [
+      p('daedong', '대동여지도', 'DaeDongYeoJiDo', 'pages', 'github-pages', { commit: st('done', '커밋', '9f8e7d2 지도에 산길 추가', 2), build: st('running', '빌드', 'GitHub Pages', 1), deploy: st('idle', '배포', 'github-pages') }, { active: true }),
+      p('betweenthelines', 'BetweenTheLines', 'BetweenTheLines', 'pages', 'github-pages', { commit: st('done', '커밋', '391ecb1 시리즈 레이아웃', 50), build: st('failed', '빌드', 'Deploy to GitHub Pages', 49, 47), deploy: st('skipped', '배포', '빌드 실패로 배포 안 함') }),
+      p('rosietechblog', 'RosieTechBlog', 'RosieTechBlog', 'vercel', 'Production', { commit: st('done', '커밋', '7dfe3a9 제목 두 번 나오는 부분 수정', 180), build: st('done', '빌드', 'Vercel', 179, 178), deploy: st('done', '배포', 'Production', 178) }, { site: 'https://rosiesblog.vercel.app' }),
+      p('otel-canary', 'otel-canary', 'otel-canary', 'pages', 'github-pages', { commit: st('done', '커밋', '07af266 기여 노트 현황 갱신', 500), build: st('done', '빌드', 'GitHub Actions', 499, 498), deploy: st('done', '배포', 'github-pages', 498, 497) }, { lastDeployAt: iso(498) }),
+    ] };
+  }],
+
   ['GET', /^\/relations$/, () => ({ rev: 1, scannedAt: iso(30), scanning: false,
     nodes: [], edges: [], unknown: [], scans: {} })],
   ['GET', /^\/runners$/, () => ({ runners: [], alerts: [], updatedAt: iso(1) })],
