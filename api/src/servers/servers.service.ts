@@ -78,7 +78,7 @@ export class ServersService {
     }
     this.pending.delete(`${def.id}:${q.action}`);
     this.save();
-    console.log(`[서버] ${def.id} ${q.action} 결과 ${p ? '받음' : '접속 실패'}`);
+    if (!process.env.NODE_TEST_CONTEXT) console.log(`[서버] ${def.id} ${q.action} 결과 ${p ? '받음' : '접속 실패'}`);
     return { ok: true };
   }
 
