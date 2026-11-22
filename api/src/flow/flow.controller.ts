@@ -14,6 +14,10 @@ export class FlowController {
   @Get('live')
   live() { return this.flow.live(); }
 
+  // 서비스별 파이프라인(커밋 → 빌드 → 배포) — 화면이 몇 초마다 부른다. GitHub 은 60초(도는 배포가 있으면 5초)에 한 번
+  @Get('pipelines')
+  pipelines(@Query('refresh') refresh?: string) { return this.flow.pipelines(refresh === '1'); }
+
   @Get('tail')
   tail(@Query('repo') repo: string, @Query('run', ParseIntPipe) run: number) {
     return this.flow.tail(String(repo || ''), run);

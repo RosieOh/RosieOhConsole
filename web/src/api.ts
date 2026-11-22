@@ -246,7 +246,16 @@ export interface RelGraph {
   unknown: { comp: string; host: string; evidence: { path: string; line: number; text: string }[] }[];
   scans: Record<string, { at: string; files: number; error?: string }>;
 }
+// 배포 흐름(서비스별 파이프라인) — api/src/flow/pipelines.ts 와 같은 모양
+export type StageState = 'done' | 'running' | 'queued' | 'failed' | 'skipped' | 'idle';
+export interface PipeStage { state: StageState; title: string; detail?: string; url?: string; at?: string | null; endedAt?: string | null }
+export interface PipeDeploy { id: number; sha: string; message: string; state: StageState; at: string; endedAt?: string | null; url?: string }
+export interface Pipeline {
+  key: string; name: string; repo: string; logo?: string | null; provider: 'pages' | 'vercel' | 'actions'; environment: string; site?: string;
+  active: boolean; stages: { commit: PipeStage; build: PipeStage; deploy: PipeStage }; history: PipeDeploy[]; lastDeployAt: string | null; error?: string;
+}
 export const flowApi = {
+  pipelines: (refresh = false) => j('GET', '/flow/pipelines' + (refresh ? '?refresh=1' : '')) as Promise<{ at: string; pipelines: Pipeline[]; error?: string }>,
   graph: () => j('GET', '/flow') as Promise<FlowGraph>,
   live: () => j('GET', '/flow/live') as Promise<{ at: string; runs: ActiveRun[] }>,
   stepLog: (repo: string, run: number, step?: string) => j('GET', `/flow/step-log?repo=${encodeURIComponent(repo)}&run=${run}${step ? '&step=' + encodeURIComponent(step) : ''}`) as Promise<{ job: string | null; step: string | null; log: string }>,
