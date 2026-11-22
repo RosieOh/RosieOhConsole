@@ -6,6 +6,7 @@ import { Avatar, UsersProvider } from './users';
 import { LiquidBg } from './components/LiquidBg';
 import { AuthPages } from './components/Login';
 import { MyPage } from './components/MyPage';
+import { Splash } from './components/Splash';
 import { Overview } from './components/Overview';
 import { Tools } from './components/Tools';
 import { Docs } from './components/Docs';
@@ -141,6 +142,9 @@ export function App() {
   const openFlow = (key: string) => { setFlowFocus(key); setPage('flow'); };
 
   useEffect(() => { api.me().then(setMe).catch(() => setMe({ authenticated: false })); }, []);
+  // 시작 로고는 잠깐이라도 보이게(0.7초) — 응답이 빠르면 깜빡이고 사라진다
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => { const t = window.setTimeout(() => setSplashDone(true), 700); return () => window.clearTimeout(t); }, []);
 
   /* 뒤로/앞으로 — 주소가 바뀌면 화면도 따라간다. 탭까지 바뀌는 경우는 각 화면이
      같은 popstate 를 듣고 자기 탭을 다시 읽는다(Tabs 의 useHashTab). */
@@ -153,7 +157,7 @@ export function App() {
     return () => window.removeEventListener('popstate', sync);
   }, []);
 
-  if (me === null) return <div className="login-wrap"><span className="muted">loading…</span></div>;
+  if (me === null || !splashDone) return <Splash />;
   if (!me.authenticated) return <AuthPages />;
   const groups = GROUPS.filter((g) => !g.admin || me.admin);
   const g = groupOf(page);

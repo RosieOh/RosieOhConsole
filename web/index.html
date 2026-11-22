@@ -27,7 +27,21 @@
         </filter>
       </defs>
     </svg>
-    <div id="root"></div>
+    <!-- 첫 화면 로고 — 번들을 받는 동안 바로 보인다. React 가 뜨면 #root 를 그대로 덮어쓴다(같은 모양의 Splash 가 이어받는다) -->
+    <script>try { if (localStorage.getItem('mxc.theme.v2') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
+    <style>
+      .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+        background: linear-gradient(160deg, #fbf3f1 0%, #f1eef6 100%); font-family: Pretendard, -apple-system, 'Segoe UI', sans-serif; }
+      :root[data-theme="dark"] .boot { background: linear-gradient(160deg, #17141c 0%, #0f0e14 100%); }
+      .boot span { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #2a1d22; opacity: 0.75; }
+      :root[data-theme="dark"] .boot span { color: #f6e9ed; }
+      @media (prefers-reduced-motion: no-preference) { .boot svg { animation: boot-breathe 1.6s ease-in-out infinite; } }
+      @keyframes boot-breathe { 50% { transform: scale(1.06); } }
+    </style>
+    <div id="root"><div class="boot" role="status" aria-label="Rosie 콘솔을 여는 중">
+      <svg width="88" height="88" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="14" cy="18" r="9.5" stroke="#E0435A" stroke-width="5"/><circle cx="26" cy="6" r="4" fill="#E0435A"/></svg>
+      <span>Rosie 콘솔</span>
+    </div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
