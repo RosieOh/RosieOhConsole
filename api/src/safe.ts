@@ -7,5 +7,5 @@ export function isSafeKey(k: unknown): k is string {
 
 /** 로그 한 줄에 넣을 값 — 줄바꿈·제어 문자를 지워 가짜 로그 줄을 끼워 넣지 못하게 한다 */
 export function logSafe(v: unknown, max = 300): string {
-  return String(v ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max);
+  return String(v ?? '').replace(/[\n\r]/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max);
 }

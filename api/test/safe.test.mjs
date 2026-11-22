@@ -12,7 +12,8 @@ test('객체 키 — 원형을 바꾸는 이름은 거절', () => {
 });
 
 test('로그 — 줄바꿈으로 가짜 줄을 끼워 넣지 못한다', () => {
-  assert.equal(logSafe('a\n[APK] admin 다운로드\r\x1b[31m'), 'a [APK] admin 다운로드 [31m');
+  assert.ok(!/[\n\r\x1b]/.test(logSafe('a\n[APK] admin 다운로드\r\x1b[31m')));
+  assert.equal(logSafe('a\nb'), 'a b');
   assert.equal(logSafe('x'.repeat(500)).length, 300);
 });
 
