@@ -1,0 +1,88 @@
+# 운영 반영 — main 의 이미지가 다 만들어지면(image 워크플로 성공) 운영 서버에 SSH 로 들어가 그 커밋의 이미지로 바꾼다
+# 서버 준비·시크릿 넣기는 scripts/oracle-setup.bash, 자세한 순서는 deploy/README.md
+#
+# 저장소 변수(Settings › Secrets and variables › Actions › Variables)
+#   DEPLOY_ENABLED = true        이 값이 있어야 돈다(서버를 준비하기 전에는 건너뜀)
+#   DEPLOY_URL     = https://…   반영 뒤 헬스 확인 주소, 배포 기록의 주소
+# 환경 production 의 시크릿
+#   DEPLOY_HOST · DEPLOY_SSH_KEY · DEPLOY_KNOWN_HOSTS (변수 DEPLOY_USER 기본 deploy, DEPLOY_PORT 기본 22)
+#
+# 서버의 deploy 키는 authorized_keys 의 command= 로 묶여 있다 — 이 키로는 "origin/main 에 있는 커밋을 반영"만 할 수 있다
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [image]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: '반영할 커밋(12~40자, main 에 있는 것). 비우면 main 최신 — 되돌리기도 이걸로'
+        required: false
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # environment 를 쓰면 GitHub Deployments 에 기록이 남는다 — 콘솔의 배포 트랙이 이것을 읽는다
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_URL }}
+    steps:
+      - name: 반영할 커밋
+        id: sha
+        env:
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          sha="${INPUT_SHA:-${RUN_SHA:-$GITHUB_SHA}}"
+          if ! [[ "$sha" =~ ^[0-9a-f]{12,40}$ ]]; then echo "::error::커밋 형식이 아닙니다: $sha"; exit 1; fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "반영할 커밋: ${sha::12}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SSH 준비
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then echo "::error::환경 production 에 DEPLOY_SSH_KEY·DEPLOY_KNOWN_HOSTS 가 없습니다"; exit 1; fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: 서버에서 반영
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER_NAME: ${{ vars.DEPLOY_USER || 'deploy' }}
+          PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          # 서버가 받는 명령은 'deploy <sha>' 하나뿐(command= 강제). 나머지는 서버의 rosie-deploy 가 한다
+          ssh -i ~/.ssh/deploy_key -p "$PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+            "$USER_NAME@$HOST" "deploy $SHA"
+
+      - name: 헬스 확인
+        if: vars.DEPLOY_URL != ''
+        env:
+          URL: ${{ vars.DEPLOY_URL }}
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 10 "${URL%/}/dashapi/health" >/dev/null; then echo "정상: $URL"; exit 0; fi
+            sleep 6
+          done
+          echo "::error::$URL/dashapi/health 가 응답하지 않습니다"; exit 1
+
+      - name: 정리
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

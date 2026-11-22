@@ -30,7 +30,7 @@
 | 저장 | `DATABASE_URL` 이 있으면 MariaDB, 없으면 파일. 콘솔은 한 대만 띄운다고 본다 |
 | 서버 점검 | 재사용 워크플로와 등록 스크립트(`scripts/new-server.bash`)는 있고, 등록된 서버는 아직 없다 |
 | 업무보드 | GitHub Issues·PR 기반. 쓰기(단계 옮기기·막힘·닫기)는 `GITHUB_WRITE_TOKEN` 이 있어야 — 없으면 읽기 전용 |
-| 배포 | CI(PR 검사)·GHCR 이미지·운영 compose 예시는 있다. 띄울 곳·도메인은 [#5](https://github.com/RosieOh/RosieOhConsole/issues/5) |
+| 운영 | Oracle Cloud 무료 ARM VM + compose(콘솔·MariaDB·Caddy). main 머지 → 이미지 → SSH 자동 반영(헬스 실패 시 이전 이미지로). 준비는 `scripts/oracle-setup.bash`, 순서는 [deploy/README.md](deploy/README.md) |
 
 ## 기술
 - **web**: React 19 · Vite 8 · TypeScript 7 · three.js(로그인 화면만, 동적 로딩). 업무보드 화면도 여기(`web/src/board/`) — 한 SPA, 한 빌드
@@ -65,6 +65,8 @@ TEST_DATABASE_URL=mariadb://console:console@127.0.0.1:3307/console npm --prefix 
 
 ## 배포
 - PR·main 마다 CI(`.github/workflows/ci.yml`) — api 빌드·시험(MariaDB 포함), web 타입 검사·시험·빌드
-- main 머지마다 이미지(`.github/workflows/image.yml`) → `ghcr.io/rosieoh/rosieohconsole:<커밋 12자>`, `:latest`
-- 운영 실행 예시: `deploy/compose.prod.yml`(GHCR 이미지 + MariaDB + Caddy 자동 HTTPS) + `deploy/Caddyfile`, 백업 `scripts/db-backup.bash --prod`
-- 띄울 곳·도메인·OAuth 운영 콜백은 [#5](https://github.com/RosieOh/RosieOhConsole/issues/5)
+- main 머지마다 이미지(`.github/workflows/image.yml`) → `ghcr.io/rosieoh/rosieohconsole:<커밋 12자>`, `:latest` (amd64·arm64)
+- 이미지가 성공하면 반영(`.github/workflows/deploy.yml`) — 운영 서버에 SSH 로 `deploy <커밋>` 만 보낸다. 서버의 `rosie-deploy` 가 main 에 있는 커밋인지 보고 `scripts/server-deploy.bash` 로 이미지를 바꾼다. 수동·되돌리기는 Actions 에서 커밋을 넣어 실행
+- 운영: Oracle Cloud 무료 ARM VM 한 대에 `deploy/compose.prod.yml`(GHCR 이미지 + MariaDB + Caddy 자동 HTTPS). 서버 준비·첫 실행은 `scripts/oracle-setup.bash ubuntu@<IP> [--domain 주소]`, 도메인 전에는 `<IP>.sslip.io`
+- 백업: 서버 cron 이 매일 `scripts/db-backup.bash --prod`
+- 자세한 순서(VM 만들기·OAuth 앱·도메인 바꾸기): [deploy/README.md](deploy/README.md)
