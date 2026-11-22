@@ -1,6 +1,8 @@
 # 서버 점검 — 서버를 맡은 저장소의 .github/workflows/probe.yml 로 복사해 쓴다(scripts/new-server.bash 가 만들어 준다).
 # 15분마다 점검하고, 콘솔 서버 화면의 [점검]·[로그]·[다시 시작]이 이 워크플로를 부른다(workflow_dispatch).
-# 필요: 시크릿 PROD_SSH_KEY · PROD_SSH_KNOWN_HOSTS · PROBE_TOKEN(콘솔 .env 와 같은 값), 변수 CONSOLE_URL(https://콘솔 주소)
+# 필요: 시크릿 __KEY___SSH_KEY · __KEY___SSH_KNOWN_HOSTS(ssh-keyscan 결과, 필수) · PROBE_TOKEN(콘솔 .env 와 같은 값), 변수 CONSOLE_URL(https://콘솔 주소)
+# 재사용 워크플로는 커밋 SHA 로 고정한다 — 콘솔 저장소의 main 이 바뀌어도 이 서버에는 확인하고 올릴 때만 반영된다.
+# 시크릿은 필요한 셋만 넘긴다(inherit 로 저장소 시크릿을 다 넘기지 않는다).
 name: probe
 
 on:
@@ -13,9 +15,12 @@ on:
       lines:   { description: '로그 줄 수', default: '300' }
       confirm: { description: 'restart 일 때 target 을 그대로', default: '' }
 
+permissions:
+  contents: read
+
 jobs:
   probe:
-    uses: RosieOh/RosieOhConsole/.github/workflows/server-probe.yml@main
+    uses: RosieOh/RosieOhConsole/.github/workflows/server-probe.yml@__REF__
     with:
       server: __SERVER__
       ssh-host: '__SSH_HOST__'
@@ -25,4 +30,7 @@ jobs:
       target: ${{ github.event.inputs.target || '' }}
       lines: ${{ github.event.inputs.lines || '300' }}
       confirm: ${{ github.event.inputs.confirm || '' }}
-    secrets: inherit
+    secrets:
+      SSH_KEY: ${{ secrets.__KEY___SSH_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.__KEY___SSH_KNOWN_HOSTS }}
+      PROBE_TOKEN: ${{ secrets.PROBE_TOKEN }}

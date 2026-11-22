@@ -84,14 +84,15 @@ export class AuthController {
   async signup(@Body() b: { login?: string; name?: string; email?: string; password?: string }, @Req() req: Request) {
     sameOrigin(req);
     try {
-      const a = signup(b || {});
+      const a = signup(b || {}, req.ip || '?');
       await audit({ login: a.login, action: 'account.signup', target: a.login, detail: `승인 대기, ${req.ip}`, ok: true });
       return { ok: true, login: a.login, status: a.status };
     } catch (e) { throw httpOf(e); }
   }
 
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    sameOrigin(req);   // 다른 사이트가 몰래 로그아웃시키지 못하게
     res.clearCookie(SESSION_COOKIE, cookieOpts());
     return { ok: true };
   }

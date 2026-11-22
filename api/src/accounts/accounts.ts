@@ -80,6 +80,17 @@ function locked(ip: string, login: string, t = Date.now()) {
 }
 const noteFail = (ip: string, login: string) => fails.set(failKey(ip, login), [...(fails.get(failKey(ip, login)) || []), Date.now()]);
 
+// ── 가입 제한 — IP 마다 1시간에 10번 시도, 승인 대기는 모두 합쳐 50명까지(대량 가입으로 명단을 덮지 못하게) ──
+const signups = new Map<string, number[]>();
+const SIGNUP_WINDOW = 60 * 60_000, SIGNUP_MAX = 10, PENDING_MAX = 50;
+function signupLimited(ip: string, t = Date.now()) {
+  for (const [k, v] of signups) if (!v.some((x) => t - x < SIGNUP_WINDOW)) signups.delete(k);   // 오래된 IP 는 비운다
+  const list = (signups.get(ip) || []).filter((x) => t - x < SIGNUP_WINDOW);
+  list.push(t);
+  signups.set(ip, list);
+  return list.length > SIGNUP_MAX;
+}
+
 // ── 읽기 ──
 export function getAccount(login: string): Account | null { return theStore().get().users[norm(login)] ?? null; }
 export function listAccounts(): Account[] { return Object.values(theStore().get().users).sort((a, b) => a.login.localeCompare(b.login)); }
@@ -101,7 +112,11 @@ function remember(login: string, e: Omit<LoginEvent, 'at'>) {
 }
 
 // ── 가입·로그인 ──
-export function signup(b: { login?: string; name?: string; email?: string; password?: string }) {
+/** ip 를 주면(화면에서 온 가입) IP 마다 시도 횟수를 센다 */
+export function signup(b: { login?: string; name?: string; email?: string; password?: string }, ip?: string) {
+  if (ip !== undefined && signupLimited(ip)) throw new AccountError('rate_limited', '가입 시도가 너무 많습니다. 1시간 뒤 다시 하세요', 429);
+  if (listAccounts().filter((a) => a.status === 'pending').length >= PENDING_MAX)
+    throw new AccountError('pending_full', '승인 대기 중인 가입이 너무 많습니다. 관리자에게 문의하세요', 429);
   const login = norm(b.login ?? '');
   const name = String(b.name ?? '').trim();
   const email = String(b.email ?? '').trim().toLowerCase();

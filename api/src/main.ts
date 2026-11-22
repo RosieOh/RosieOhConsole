@@ -3,11 +3,12 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import express from 'express';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AppModule } from './app.module.js';
 import { BoardService } from './board/board.service.js';
-import { assertConfig, cfg } from './config.js';
+import { assertConfig, cfg, secureCookie } from './config.js';
+import { securityHeaders } from './security-headers.js';
 import { testbedProxy } from './testbed-proxy.js';
 import { closePersist, initPersist, persistInfo } from './persist.js';
 import { banner } from './banner.js';
@@ -17,6 +18,10 @@ async function bootstrap() {
   await initPersist();   // MariaDB 면 표를 만들고 문서를 읽는다 — 서비스들이 생성자에서 읽으므로 Nest 보다 먼저
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.set('trust proxy', 1);   // 리버스 프록시 뒤
+  app.disable('x-powered-by');
+  const pub = fileURLToPath(new URL('../public', import.meta.url));
+  const indexHtml = existsSync(pub + '/index.html') ? readFileSync(pub + '/index.html', 'utf8') : undefined;
+  app.use(securityHeaders({ https: secureCookie(), indexHtml }));
   app.use(cookieParser());
   app.use('/mxtest', testbedProxy);                     // 본문을 그대로 넘기므로 JSON 파서보다 먼저
   app.use('/dashapi/probe/ingest', express.text({ type: '*/*', limit: '4mb' }));   // 서버 점검 결과(text)
@@ -30,7 +35,6 @@ async function bootstrap() {
   });
 
   // React 빌드(public) + SPA fallback — /dashapi·/mxtest 밖의 GET 은 화면
-  const pub = fileURLToPath(new URL('../public', import.meta.url));
   if (existsSync(pub)) {
     app.use(express.static(pub, { index: false, maxAge: '1h' }));
     // 보드 화면은 콘솔 안으로 들어왔다(#148) — 따로 빌드하지 않는다.
