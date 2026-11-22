@@ -30,6 +30,8 @@ scripts/new-app.bash rosie-notes --name "Rosie Notes" --kind web --group web --n
 | `setup-env.bash` | `.env.example` → `.env`, `SESSION_SECRET` 생성, 빈 값은 물어서 채움 |
 | `set-password.bash <아이디>` | 계정 비밀번호를 터미널에서 정한다(입력 숨김). 처음 관리자는 계정이 없어도 만든다 — GitHub 로그인 전이나 비밀번호를 잊었을 때 |
 | `db-backup.bash [--prod]` | MariaDB 덤프를 `backups/` 에 압축 저장, 최근 7개만 남김(`KEEP`·`BACKUP_DIR`). `--prod` 는 `deploy/compose.prod.yml` 의 DB |
+| `oracle-setup.bash ubuntu@<IP> [--domain 주소]` | 운영 서버(Oracle 무료 ARM VM 등 Ubuntu) 준비 — Docker·방화벽·deploy 사용자·저장소·백업 cron, 반영 키(command= 로 묶음), 서버의 `deploy/.env`, GitHub 환경 `production` 시크릿·변수, 첫 실행. `deploy/README.md` |
+| `server-deploy.bash <커밋>` | (운영 서버에서) 그 커밋의 이미지로 바꾸고 헬스가 안 오르면 이전 이미지로. 보통 deploy 워크플로가 부른다 |
 | `dev.bash [--mock]` | api(8087) + web(Vite 5173) 을 같이 띄우고 Ctrl+C 로 둘 다 끔. `--mock` 은 토큰 없이 가짜 API |
 | `check.bash [api\|web] [--build]` | api 빌드·시험, web 타입 검사·시험 — 커밋 전에 |
 | `git/setup-claude.bash [--check\|--remove]` | CLAUDE.md 에 Git·GitHub 규칙, commit-msg 훅(`TYPE : 본문` 검사·AI 서명 제거), 커밋 템플릿, `.claude/settings.json`. 파일 하나로 다른 저장소에서도 쓴다 |
