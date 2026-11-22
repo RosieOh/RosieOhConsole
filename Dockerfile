@@ -27,7 +27,10 @@ FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d
 WORKDIR /app
 ENV NODE_ENV=production TZ=Asia/Seoul
 COPY api/package.json api/package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+# 실행에는 node 만 쓴다 — 설치가 끝나면 npm·npx·corepack·yarn 을 지운다(기반 이미지에 묶인 npm 의존성 취약점·공격 표면을 없앤다)
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg /root/.npm
 COPY --from=api /api/dist ./dist
 COPY api/docs ./docs
 COPY --from=web /web/dist ./public
