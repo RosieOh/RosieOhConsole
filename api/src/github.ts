@@ -69,3 +69,11 @@ export async function ownerRepos(): Promise<any[]> {
   ]);
   return [...mine, ...orgs.flat()];
 }
+
+/** GraphQL — 오류가 있으면 첫 메시지로 던진다 */
+export async function ghGraphql<T = any>(query: string, variables: Record<string, unknown>, token = cfg.githubToken): Promise<T> {
+  const res = await ghFetch('graphql', { method: 'POST', body: JSON.stringify({ query, variables }) }, token, 30000);
+  const j: any = await res.json().catch(() => ({}));
+  if (!res.ok || j.errors?.length) throw new Error(`GitHub GraphQL → ${j.errors?.[0]?.message || `HTTP ${res.status}`}`);
+  return j.data as T;
+}

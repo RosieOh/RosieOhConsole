@@ -17,7 +17,7 @@ const STATUS_CLS: Record<ReportStatus, string> = {
 };
 const rippleAt = (el: Element, color: string) => { const r = el.getBoundingClientRect(); field.ripple(r.left + r.width / 2, r.top + r.height / 2, color, true); };
 
-/** 주간보고 검수 — 프로젝트마다 자동 초안을 보여 주고, 사람이 고친 뒤 [시트에 반영]을 누르면 그 주 칸만 시트에 쓴다 */
+/** 주간보고 검수 — 프로젝트(따라가는 저장소)마다 이슈 기록으로 만든 초안을 보여 주고, 사람이 고친 뒤 [확정]을 누르면 그 주 보고로 남긴다 */
 export function ReportPage({ me, active }: { me: string | null; active: boolean }) {
   const [data, setData] = useState<ReportData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -72,7 +72,7 @@ export function ReportPage({ me, active }: { me: string | null; active: boolean 
         if (el) bloom(el, 120 + i * 110);
       });
     }
-    if (fail.length) toast.error(`${ok}개 반영, ${fail.length}개 실패, ${fail[0]}`, { duration: 10000 }); else toast.success(`${ok}개 프로젝트를 시트에 반영했습니다`);
+    if (fail.length) toast.error(`${ok}개 반영, ${fail.length}개 실패, ${fail[0]}`, { duration: 10000 }); else toast.success(`${ok}개 프로젝트를 확정했습니다`);
     setBusyAll(false);
     void load();
   }
@@ -92,11 +92,11 @@ export function ReportPage({ me, active }: { me: string | null; active: boolean 
           onClick={(e) => void reflectAll(e.currentTarget)}>
           {busyAll ? '반영하는 중…' : armed ? `${pending.length}개 프로젝트를 반영할까요? 한 번 더 누르세요` : `전체 반영 (${pending.length})`}
         </button>
-        <span className="board-rp-note">반영하면 시트에서 이 주차 칸만 바뀝니다. 단계는 이슈 기록 그대로 적혀 있으니 문장만 다듬어 반영하세요.</span>
+        <span className="board-rp-note">확정하면 이 주차 보고로 남습니다. 단계는 이슈 기록 그대로 적혀 있으니 문장만 다듬어 확정하세요.</span>
       </div>
       {!data.weekFound && (
         <div className="board-rp-warn">
-          시트에 "{data.week}" 주차 열이 아직 없어 반영할 수 없습니다. 시트에 이 주차 열을 추가한 뒤 다시 여세요.
+          "{data.week}" 주차 보고를 아직 열 수 없습니다. 잠시 뒤 다시 여세요.
         </div>
       )}
       <div className="board-rp-grid">
@@ -106,7 +106,7 @@ export function ReportPage({ me, active }: { me: string | null; active: boolean 
         <>
           <div className="board-rp-sub">
             <h2>저장소가 연결되지 않은 프로젝트 {unmapped.length}개</h2>
-            <span>시트의 저장소 매핑 탭에서 저장소를 적으면 초안이 만들어집니다. 직접 써서 반영할 수도 있습니다.</span>
+            <span>업무 › 저장소 관리에서 저장소를 따라가면 초안이 만들어집니다. 직접 써서 확정할 수도 있습니다.</span>
           </div>
           <div className="board-rp-grid faded">
             {unmapped.map((p) => <Panel key={p.name} p={p} me={me} canReflect={data.weekFound} onDone={load} />)}
@@ -146,7 +146,7 @@ function Panel({ p, me, canReflect, onDone }: { p: ReportProject; me: string | n
         reflected({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
         const card = btn.closest('[data-project]');
         if (card) bloom(card);
-        toast.success(`${p.name}, 시트에 반영했습니다`);
+        toast.success(`${p.name}, 확정했습니다`);
       }
       await onDone();
     } catch (e) { toast.error(`하지 못했습니다, ${(e as Error).message}`, { duration: 8000 }); }
@@ -178,12 +178,12 @@ function Panel({ p, me, canReflect, onDone }: { p: ReportProject; me: string | n
           {p.warnings.map((w) => <li key={w}>{w}</li>)}
         </ul>
       )}
-      {p.sheetText && <details className="board-sheet"><summary>시트의 지금 내용</summary>
+      {p.sheetText && <details className="board-sheet"><summary>확정한 내용</summary>
         <pre>{p.sheetText}</pre></details>}
       <div className="board-panel-foot">
         <span className="who">{who}</span>
         {status !== 'auto' && <button type="button" className="btn" disabled={busy} onClick={(e) => void act('reset', e.currentTarget)}>자동 초안으로</button>}
-        <button type="button" className="btn primary" disabled={busy || !canReflect} onClick={(e) => void act('reflect', e.currentTarget)}>시트에 반영</button>
+        <button type="button" className="btn primary" disabled={busy || !canReflect} onClick={(e) => void act('reflect', e.currentTarget)}>확정</button>
       </div>
     </article>
   );

@@ -1,8 +1,10 @@
 import { STAGES, STAGE_KO } from './stages';
 import { orbBackground, undoPlan, dueText, needsCheck } from './format';
-// 서버 쪽 단계 정의(board-core)는 걷어냈다 — 업무보드 서버를 GitHub 기반으로 다시 만들면 화면↔서버 비교 시험을 되살린다
-test('단계마다 한글 이름이 있다', () => {
-  for (const s of STAGES) expect(STAGE_KO[s]).toBeTruthy();
+import { STAGES as SERVER_STAGES, STAGE_KO as SERVER_KO } from '../../../../api/src/board/derive';
+
+test('단계 목록·이름은 서버(api/src/board/derive.ts)와 같다', () => {
+  expect(STAGES).toEqual([...SERVER_STAGES]);
+  for (const s of STAGES) expect(STAGE_KO[s]).toBe(SERVER_KO[s]);
 });
 
 test('되돌리기: 기록을 따르던 카드는 기록 따르기, 사람이 정한 카드는 원래 칸으로', () => {
