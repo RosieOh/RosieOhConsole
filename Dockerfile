@@ -1,7 +1,7 @@
 # ── web (React 19 · Vite 8) 빌드 ──
 # 빌드·시험 단계는 빌드하는 기계의 아키텍처($BUILDPLATFORM)에서 한 번만 돈다 — 산출물(웹 정적 파일·api JS)은 아키텍처와 상관없다.
 # amd64·arm64 이미지를 함께 만들 때 대상 아키텍처마다 다시 도는 건 아래 런타임 단계뿐이다
-FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS web
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -13,7 +13,7 @@ COPY api/src/board/derive.ts /api/src/board/derive.ts
 RUN npm run build && npm test
 
 # ── api (NestJS 12, ESM) 빌드 ──────────────────────────
-FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS api
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS api
 WORKDIR /api
 COPY api/package.json api/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -23,7 +23,7 @@ COPY .github/workflows/server-probe.yml /.github/workflows/server-probe.yml
 RUN npm run build && npm test
 
 # ── 런타임 (NestJS 가 API + React 빌드 동시 서빙) ───────
-FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS runtime
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runtime
 # 기반 이미지 이후에 나온 alpine 보안 패치(openssl·zlib 등)를 받는다 — image.yml 은 이 단계를 캐시하지 않아 빌드할 때마다 새로 받는다
 RUN apk upgrade --no-cache
 WORKDIR /app
