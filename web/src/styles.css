@@ -4186,3 +4186,13 @@ a.pipe-step:hover { border-color: color-mix(in srgb, var(--pipe-run) 40%, var(--
   .pipe-hist-row > .muted { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .pipe-link.l-flow, .pipe-step.s-running .pipe-ico { animation: none; } }
+
+/* ── 구성도 요약(연결 구조) ── */
+.arch-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 12px; }
+.arch-sum > div { background: var(--canvas); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.arch-sum b { font-size: 20px; }
+.arch-sum span { font-size: 11.5px; color: var(--muted); }
+.arch-kind { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 2px; border-bottom: 1px dashed var(--border); }
+.fx-cam { display: flex; gap: 6px; }
+/* 구성도 — 범례는 오른쪽 위(긴 목록의 왼쪽 아래 노드를 가리지 않게) */
+.fx-legend2.top { left: auto; right: 12px; top: 12px; bottom: auto; max-width: 360px; }

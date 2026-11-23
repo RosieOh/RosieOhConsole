@@ -17,7 +17,7 @@ import { edgeTypes, nodeTypes } from './parts';
 // 서비스를 고르면 그 서비스의 갈래와 연관 서비스(쓰는 것·이걸 쓰는 것)가 밝아지고 나머지는 흐려진다(잘라 내지 않는다).
 type EdgeState = 'idle' | 'dim' | 'focus' | 'past' | 'active' | 'next' | 'fail';
 const RANK: Record<EdgeState, number> = { idle: 0, dim: 0, focus: 1, next: 2, past: 3, fail: 4, active: 5 };
-const DEP = '#0891b2', USER = '#e11d48';
+const DEP = '#0891b2', USER = '#e11d48', HOST = '#2f8f6b';
 
 interface Demo { comp: string; lane: LaneKind; index: number; branch?: 'ota' | 'store'; failAt?: number; step?: string | null; run?: ActiveRun }
 
@@ -28,7 +28,7 @@ export function SystemFlow(props: { mode: 'deploy' | 'architecture'; initialFocu
 // 흐름 따라가기 — 지금 움직이는 구간으로 화면을 옮기고(확대), 다 끝나면 전체로 돌아온다. 도식은 늘 전체가 그려져 있다.
 // 범위는 배치 좌표(layout)로 직접 계산한다 — 라이브러리가 노드 크기를 재기 전이면 엉뚱한 곳(빈 화면)으로 갈 수 있다
 type Rect = { x: number; y: number; width: number; height: number };
-function Camera({ rect, all, follow, home, placed, focusRect }: { rect: Rect | null; all: Rect | null; follow: boolean; home: number; placed: { x: number; y: number; w: number; h: number }[]; focusRect: Rect | null }) {
+function Camera({ rect, all, follow, home, placed, focusRect, fitWidth }: { rect: Rect | null; all: Rect | null; follow: boolean; home: number; placed: { x: number; y: number; w: number; h: number }[]; focusRect: Rect | null; fitWidth?: boolean }) {
   const rf = useReactFlow();
   // 안전장치 — 1초마다 화면 안에 노드가 하나라도 보이는지 본다. 없으면(빈 화면) 고른 경로나 전체로 되돌린다
   useEffect(() => {
@@ -54,7 +54,16 @@ function Camera({ rect, all, follow, home, placed, focusRect }: { rect: Rect | n
   useEffect(() => { if (home && ok(all)) void rf.fitBounds(all!, { duration: 700, padding: 0.04 }); }, [home]);   // eslint-disable-line
   // 처음: 따라갈 구간이 있으면 거기로, 없으면 전체(한 번만 — 다른 맞추기가 덮어쓰지 않게)
   useEffect(() => {
-    const t = setTimeout(() => { if (follow && ok(rect)) void rf.fitBounds(rect!, { padding: 0.35 }); else if (ok(all)) void rf.fitBounds(all!, { padding: 0.04 }); }, 60);
+    const t = setTimeout(() => {
+      if (follow && ok(rect)) void rf.fitBounds(rect!, { padding: 0.35 });
+      else if (fitWidth && ok(all)) {
+        // 길게 늘어선 목록 — 폭에 맞춰 위에서부터 읽게(글씨가 작아지지 않게). 휠로 아래로 내린다
+        const el = document.querySelector('.fx-canvas') as HTMLElement | null;
+        const w = el?.clientWidth ?? 900;
+        const zoom = Math.min(1, Math.max(0.45, (w - 40) / all!.width));
+        void rf.setViewport({ x: (w - all!.width * zoom) / 2 - all!.x * zoom, y: 56 - all!.y * zoom, zoom });
+      } else if (ok(all)) void rf.fitBounds(all!, { padding: 0.04 });
+    }, 60);
     return () => clearTimeout(t);
   }, [ok(all)]);   // eslint-disable-line
   return null;
@@ -80,12 +89,14 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
   const [follow, setFollow] = useState(mode === 'deploy');
   const [lane, setLane] = useState<LaneKind | null>(null);
   const [home, setHome] = useState(0);
+  const [showAll, setShowAll] = useState(mode !== 'architecture');   // 구성도: 처음에는 연결 있는 서비스만
 
   useEffect(() => {
     const load = () => flowApi.graph().then(setG).catch((e) => setErr(String(e?.message || e)));
     load(); const t = setInterval(load, 60000); return () => clearInterval(t);
   }, []);
-  const livePoll = usePoll(() => flowApi.live().then((r) => setRuns(r.runs)), 2500);
+  // 진행 중 배포는 배포 모드에서만 — 구성도는 연결 구조만 본다
+  const livePoll = usePoll(() => (mode === 'deploy' ? flowApi.live().then((r) => setRuns(r.runs)) : undefined), mode === 'deploy' ? 2500 : 0);
   useEffect(() => {
     const load = () => api.status().then((r) => setHealth(Object.fromEntries(r.services.map((s) => [s.key, s])))).catch(() => {});
     load(); const t = setInterval(load, 15000); return () => clearInterval(t);
@@ -103,7 +114,9 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
     return () => clearTimeout(t);
   }, [demo, g]);
 
-  const lay = useMemo(() => (g ? layout(g) : null), [g]);
+  // 구성도 — 연결(연관 관계·배포 대상·배포 갈래)이 있는 구성요소만 그린다. 나머지는 "연결 없는 저장소 N개 보기"로
+  const shown = useMemo(() => (g ? connectedOnly(g, showAll) : null), [g, showAll]);
+  const lay = useMemo(() => (shown ? layout(shown.graph, { compact: mode === 'architecture' }) : null), [shown, mode]);
 
   const view = useMemo(() => {
     if (!g || !lay) return { nodes: [] as Node[], edges: [] as Edge[], liveNodes: new Map<string, string[]>(), activeIds: [] as string[], focusIds: [] as string[] };
@@ -167,9 +180,10 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
     for (const r of rels) {
       const mine = hot.has(r.from) || hot.has(r.to);
       if (!mine && !showRel) continue;
-      const color = r.from === `comp:${focus}` ? DEP : r.to === `comp:${focus}` ? USER : 'var(--violet)';
+      const deploy = r.state === 'deploy';
+      const color = deploy ? HOST : r.from === `comp:${focus}` ? DEP : r.to === `comp:${focus}` ? USER : 'var(--violet)';
       edges.push({ id: `rel:${r.id}`, source: r.from, target: r.to, type: 'lane', zIndex: mine ? 3 : 0,
-        data: { state: mine ? 'focus' : focus ? 'dim' : 'idle', color, dashed: true } });
+        data: { state: mine ? 'focus' : focus ? 'dim' : 'idle', color, dashed: !deploy } });
     }
 
     const nodes: Node[] = lay.placed.map((p) => {
@@ -246,8 +260,8 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
           {err && <div className="panel err">{err}</div>}
           {!g && !err && <div className="skeleton" style={{ position: 'absolute', inset: 12 }} />}
           {g && (
-            <ReactFlow nodes={view.nodes} edges={view.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
-              minZoom={0.15} maxZoom={1.6} proOptions={{ hideAttribution: true }} nodesConnectable={false} elementsSelectable
+            <ReactFlow key={showAll ? 'all' : 'linked'} nodes={view.nodes} edges={view.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+              minZoom={0.15} maxZoom={1.6} proOptions={{ hideAttribution: true }} nodesConnectable={false} elementsSelectable panOnScroll={mode === 'architecture'}
               onNodeClick={(_, n) => { if (n.type === 'comp') { const k = n.id.slice(5); pick(focus === k ? null : k); } }}
               onPaneClick={() => pick(null)}>
               <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="var(--canvas-dot)" />
@@ -260,14 +274,20 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
                 const at = ps.sort((a, b) => b.x - a.x)[0] ?? (lay.placed ?? []).find((p) => p.id === `comp:${live.comps[0]}`);
                 return at ? <LiveLog run={live} x={at.x + at.w + 18} y={at.y - 8} color={LANE_COLOR[live.lane]} onOpen={() => setLogOf({ run: live, step: live.stage.current ?? undefined })} /> : null;
               })()}
-              <Camera placed={lay?.placed ?? []} focusRect={boundsOf((lay?.placed ?? []).filter((p) => focusIds.includes(p.id)))} rect={(() => { const r = boundsOf((lay?.placed ?? []).filter((p) => (view.activeIds.length ? view.activeIds : focusIds).includes(p.id))); return r && running.length ? { ...r, width: r.width + 420, height: Math.max(r.height, 260) } : r; })()} all={boundsOf(lay?.placed ?? [])} follow={follow} home={home} />
+              <Camera placed={lay?.placed ?? []} focusRect={boundsOf((lay?.placed ?? []).filter((p) => focusIds.includes(p.id)))} rect={(() => { const r = boundsOf((lay?.placed ?? []).filter((p) => (view.activeIds.length ? view.activeIds : focusIds).includes(p.id))); return r && running.length ? { ...r, width: r.width + 420, height: Math.max(r.height, 260) } : r; })()} all={boundsOf(lay?.placed ?? [])} follow={follow} home={home} fitWidth={mode === 'architecture'} />
               {mode === 'architecture' && (
                 <div className="fx-cam">
                   <button className="btn sm" onClick={() => setHome((x) => x + 1)}><Maximize2 size={14} />전체 보기</button>
+                  {shown && shown.hidden + (showAll ? shown.hiddenWhenFiltered : 0) > 0 && (
+                    <button className={'btn sm' + (showAll ? ' primary' : '')} onClick={() => setShowAll(!showAll)}>
+                      {showAll ? '연결 있는 것만' : `연결 없는 저장소 ${shown.hidden}개 보기`}
+                    </button>
+                  )}
                 </div>
               )}
-              <div className="fx-legend2">
-                {(Object.keys(LANE_COLOR) as LaneKind[]).map((l) => <span key={l}><i style={{ background: LANE_COLOR[l] }} />{LANE_NAME[l]}</span>)}
+              <div className={'fx-legend2' + (mode === 'architecture' ? ' top' : '')}>
+                {[...new Set(g.lanes.map((l) => l.lane))].map((l) => <span key={l}><i style={{ background: LANE_COLOR[l] }} />{LANE_NAME[l]}</span>)}
+                {g.relations.some((r) => r.state === 'deploy') && <span><i style={{ background: HOST }} />배포 대상</span>}
                 <span><i style={{ background: DEP }} />쓰는 것</span><span><i style={{ background: USER }} />이걸 쓰는 서비스</span>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}><input type="checkbox" style={{ width: 'auto' }} checked={showRel} onChange={(e) => setShowRel(e.target.checked)} />연결 모두</label>
               </div>
@@ -282,6 +302,11 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
           )}
         </div>
 
+        {mode === 'architecture' ? (
+          <aside className="fx-side">
+            {focusComp && g ? <Impacts comp={focus!} g={g} health={health} deploying={false} /> : g && shown ? <ArchSummary g={g} shown={shown} /> : null}
+          </aside>
+        ) : (
         <aside className="fx-side">
           <div style={{ marginBottom: 12 }}><RefreshBar poll={livePoll} live /></div>
           <div className="side-title"><Activity size={15} />지금 진행 중 {running.length > 0 && <span className="chip amber">{running.length}</span>}</div>
@@ -304,6 +329,7 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
             <Impacts comp={focus!} g={g} health={health} deploying={running.some((r) => r.comps.includes(focus!))} />
           )}
         </aside>
+        )}
       </div>
 
       {logOf && (
@@ -311,6 +337,45 @@ function SystemFlowInner({ mode, initialFocus, onOpenFlags }: { mode: 'deploy' |
           <StepLog run={logOf.run} step={logOf.step} />
         </Drawer>
       )}
+    </div>
+  );
+}
+
+/** 연결(연관 관계·배포 대상·배포 갈래)이 있는 구성요소만 남긴 그래프 — 빈 프로젝트·그룹도 뺀다 */
+export function connectedOnly(g: FlowGraph, all: boolean) {
+  const linked = new Set<string>();
+  for (const r of g.relations) for (const id of [r.from, r.to]) if (id.startsWith('comp:')) linked.add(id.slice(5));
+  for (const l of g.lanes) linked.add(l.comp);
+  const keep = all ? new Set(g.components.map((c) => c.key)) : linked;
+  const comps = g.components.filter((c) => keep.has(c.key));
+  const projOf = new Set(comps.map((c) => c.project));
+  const prune = (list: FlowGraph['projects']): FlowGraph['projects'] => list.flatMap((n) => {
+    if (n.type === 'group') { const children = prune(n.children); return children.length ? [{ ...n, children }] : []; }
+    return projOf.has(n.id) ? [n] : [];
+  });
+  const hidden = g.components.length - linked.size;
+  return { graph: { ...g, components: comps, projects: all ? g.projects : prune(g.projects) }, linked: linked.size, hidden: all ? 0 : hidden, hiddenWhenFiltered: hidden };
+}
+
+function ArchSummary({ g, shown }: { g: FlowGraph; shown: ReturnType<typeof connectedOnly> }) {
+  const rels = g.relations.filter((r) => r.state !== 'deploy');
+  const deploys = g.relations.filter((r) => r.state === 'deploy');
+  const byKind = new Map<string, number>();
+  for (const r of rels) { const n = g.infra.find((x) => x.id === r.to); const k = n ? (KIND_ICON[n.kind]?.[1] ?? '외부 서비스') : '서비스'; byKind.set(k, (byKind.get(k) || 0) + 1); }
+  return (
+    <div>
+      <div className="side-title"><Link2 size={15} />연결 구조</div>
+      <div className="arch-sum">
+        <div><b>{shown.linked}</b><span>연결 있는 서비스</span></div>
+        <div><b>{rels.length}</b><span>쓰는 것</span></div>
+        <div><b>{deploys.length}</b><span>배포</span></div>
+      </div>
+      {[...byKind.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => <div key={k} className="arch-kind"><span>{k}</span><b>{n}</b></div>)}
+      <div className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.6 }}>
+        서비스를 누르면 그 서비스가 쓰는 것(DB·Redis·외부 서비스)과 그 서비스를 쓰는 곳이 보입니다.
+        연결은 저장소 설정 파일의 키 이름·주소로 자동 수집합니다(구성도 › 연관 관계에서 확정·거절).
+        {shown.hidden > 0 && <> 연결이 없는 저장소 {shown.hidden}개는 숨겼습니다.</>}
+      </div>
     </div>
   );
 }

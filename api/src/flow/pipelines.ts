@@ -17,6 +17,16 @@ export interface Pipeline {
   error?: string;
 }
 
+/** 배포 대상 — 사이트 주소로 GitHub Pages·Vercel·그 밖의 호스트를 가린다(구성도의 "배포 대상" 노드) */
+export function deployHostOf(site: string | undefined, environment: string): { id: string; name: string; sub: string } {
+  let host = '';
+  try { host = new URL(site || '').hostname; } catch { /* 주소 없음 */ }
+  if (environment === 'github-pages' || host.endsWith('.github.io')) return { id: 'v:host-pages', name: 'GitHub Pages', sub: '정적 사이트 · github.io' };
+  if (host.endsWith('.vercel.app')) return { id: 'v:host-vercel', name: 'Vercel', sub: '정적·서버리스 · vercel.app' };
+  const name = host || environment;
+  return { id: `v:host-${name.toLowerCase().replace(/[^a-z0-9.-]/g, '-')}`, name, sub: `배포 환경 ${environment}` };
+}
+
 const SUITE = `checkSuites(first: 10) { nodes { app { slug } status conclusion workflowRun { databaseId url createdAt updatedAt workflow { name } } } }`;
 
 /** 구성요소마다 별칭 r0, r1 … 로 묶은 질의 하나 */
