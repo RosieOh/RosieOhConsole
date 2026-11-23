@@ -1,8 +1,9 @@
-import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard, DeployerOnly } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg, originOk } from '../config.js';
+import { cfg } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
 import { FlagsService } from './flags.service.js';
 
 @UseGuards(AuthGuard)
@@ -20,8 +21,7 @@ export class FlagsController {
   @DeployerOnly()
   @Post()
   set(@Req() req: Request, @Body() body: any) {
-    const origin = req.get('origin');
-    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    assertSameOrigin(req);
     return this.flags.set(sessionOf(req)!.login, body || {});
   }
 }

@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { Role, canDeploy, isAllowed, roleOf } from '../access/access.js';
-import { cfg } from '../config.js';
+import { cfg } from '../core/config.js';
 import { getAccount } from '../accounts/accounts.js';
 
 // 세션 쿠키 — 로그인 아이디와 세션 판 번호(v)만 싣는다(GitHub 토큰·비밀번호는 싣지 않는다).

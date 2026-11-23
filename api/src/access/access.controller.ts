@@ -1,16 +1,12 @@
-import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg, originOk } from '../config.js';
-import { RevConflict } from '../json-store.js';
+import { cfg } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
+import { RevConflict } from '../core/json-store.js';
 import { LOGIN_RE, Role, listAccess, roleOf, setRole } from './access.js';
-
-const sameOrigin = (req: Request) => {
-  const origin = req.get('origin');
-  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
-};
 
 // 프로필 사진은 GitHub 의 공개 주소로 — API 호출 없이
 const avatarOf = (login: string) => `${cfg.githubWeb}/${encodeURIComponent(login)}.png?size=80`;
@@ -50,7 +46,7 @@ export class AccessController {
   /** 사람 추가·역할 바꾸기. role 'none' 이면 명단에서 뺀다(로그인 못 함) */
   @Put(':login')
   async set(@Req() req: Request, @Param('login') login: string, @Body() b: { role?: Role | 'none'; rev?: number }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     const me = sessionOf(req)!.login;
     if (!LOGIN_RE.test(login)) throw new BadRequestException('GitHub 아이디 형식이 아닙니다');
     let rev: number | undefined;

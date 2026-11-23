@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
-const { inlineScriptHashes, contentSecurityPolicy, securityHeaders } = await import('../dist/security-headers.js');
+const { inlineScriptHashes, contentSecurityPolicy, securityHeaders } = await import('../dist/core/security-headers.js');
 
 test('index.html 의 src 없는 스크립트만 해시로', () => {
   const body = "try { document.documentElement.dataset.theme = 'dark'; } catch (e) {}";

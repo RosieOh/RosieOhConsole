@@ -3,11 +3,13 @@ import type { Request, Response } from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { sessionOf } from '../auth/session.js';
-import { cfg, full, originOk } from '../config.js';
-import { ghUrl } from '../github.js';
-import { logSafe } from '../safe.js';
+import { cfg, full } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
+import { ghUrl } from '../core/github.js';
+import { logSafe } from '../core/safe.js';
 import { ApksService } from './apks.service.js';
-import { contentDisposition, rateLimiter } from './release.js';
+import { contentDisposition } from './release.js';
+import { rateLimiter } from '../core/rate-limit.js';
 import { WHO_RE } from './knox.js';
 
 // 로그인 없이 쓴다(사용자 요청 2026-10-12) — 목록·다운로드 모두. 받은 기록은 아이디(있으면)와 IP 로 남긴다
@@ -37,8 +39,7 @@ export class ApksController {
   // 녹스 적용 표시 — 비개발자 담당자도 쓰므로 로그인 없이 가능(이름 입력), 로그인했으면 아이디로
   @Post(':repo/knox')
   async knox(@Param('repo') repo: string, @Body() b: { tag?: string; by?: string; undo?: boolean }, @Req() req: Request) {
-    const origin = req.get('origin');
-    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    assertSameOrigin(req);
     const by = sessionOf(req)?.login ?? String(b?.by || '').trim();
     if (!WHO_RE.test(by)) throw new BadRequestException('이름을 입력하세요');
     try { await this.apks.markKnox(repo, String(b?.tag || ''), sessionOf(req) ? by : `${by}(${req.ip})`, !!b?.undo); }
@@ -56,8 +57,7 @@ export class ApksController {
   async saveShipped(@Param('repo') repo: string, @Body() b: { from?: string; rec?: any; remove?: boolean; rev?: number }, @Req() req: Request) {
     const s = sessionOf(req);
     if (!s) throw new ForbiddenException('로그인한 사람만 출고 기록을 고칠 수 있습니다');
-    const origin = req.get('origin');
-    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    assertSameOrigin(req);
     try { return await this.apks.saveShipped(repo, b?.from ? String(b.from) : null, b?.remove ? null : b?.rec ?? {}, s.login, typeof b?.rev === 'number' ? b.rev : undefined); }
     catch (e: any) { throw new BadRequestException(e?.message); }
   }
@@ -67,8 +67,7 @@ export class ApksController {
   async note(@Param('repo') repo: string, @Body() b: { tag?: string; text?: string }, @Req() req: Request) {
     const s = sessionOf(req);
     if (!s) throw new ForbiddenException('로그인한 사람만 메모를 쓸 수 있습니다');
-    const origin = req.get('origin');
-    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    assertSameOrigin(req);
     try { await this.apks.setNote(repo, String(b?.tag || ''), String(b?.text ?? ''), s.login); } catch (e: any) { throw new BadRequestException(e?.message); }
     return { ok: true };
   }

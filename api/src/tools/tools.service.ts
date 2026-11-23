@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { cfg, full } from '../config.js';
-import { ghJson, ghRaw, ownerRepos } from '../github.js';
+import { cfg, full } from '../core/config.js';
+import { ghJson, ghRaw, ownerRepos } from '../core/github.js';
 import { ToolMeta, catalog } from './catalog.js';
 
 export interface ToolRepo {

@@ -16,7 +16,7 @@ const D = await import('../dist/board/derive.js');
 const { BoardService, isoWeek } = await import('../dist/board/board.service.js');
 const { signSession } = await import('../dist/auth/session.js');
 const { setRole } = await import('../dist/access/access.js');
-const { cfg } = await import('../dist/config.js');
+const { cfg } = await import('../dist/core/config.js');
 setRole('boss', 'dev1', 'viewer');
 
 const NOW = Date.parse('2026-11-21T12:00:00Z');

@@ -3,7 +3,7 @@ import { __PASCAL__Item, __PASCAL__View, toView } from './model.js';
 
 const TTL_MS = 30 * 1000;
 
-// __TITLE__ — 원본에서 읽어 잠깐 들고 있는다. GitHub 은 ../github.js 의 ghJson·ghPaged·ownerRepos 를 쓴다
+// __TITLE__ — 원본에서 읽어 잠깐 들고 있는다. GitHub 은 ../core/github.js 의 ghJson·ghPaged·ownerRepos 를 쓴다
 @Injectable()
 export class __PASCAL__Service {
   private cache: { at: number; data: __PASCAL__View } | null = null;

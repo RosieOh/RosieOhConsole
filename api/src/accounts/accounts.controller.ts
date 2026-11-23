@@ -1,18 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { giveSession, httpOf } from '../auth/auth.controller.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg, originOk } from '../config.js';
+import { cfg } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
 import {
   ADMIN_ACTIONS, AdminAction, adminAction, bumpSession, changePassword, listAccounts, myPage, publicAccount, unlinkGithub, updateProfile, withdraw,
 } from './accounts.js';
 
-const sameOrigin = (req: Request) => {
-  const origin = req.get('origin');
-  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
-};
 const me = (req: Request) => sessionOf(req)!.login;
 
 // 마이페이지 — 로그인한 본인 것만
@@ -26,7 +23,7 @@ export class AccountController {
 
   @Put()
   async update(@Req() req: Request, @Body() b: { name?: string; email?: string }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const a = updateProfile(me(req), b || {});
       await audit({ login: a.login, action: 'account.profile', target: a.login, ok: true });
@@ -37,7 +34,7 @@ export class AccountController {
   // 비밀번호 바꾸기·정하기 — 다른 기기는 끊기고 이 기기는 새 쿠키로 이어진다
   @Post('password')
   async password(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() b: { current?: string; next?: string }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const login = me(req);
       giveSession(res, login, changePassword(login, b || {}));
@@ -48,7 +45,7 @@ export class AccountController {
 
   @Post('logout-others')
   async logoutOthers(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const login = me(req);
       giveSession(res, login, bumpSession(login));
@@ -59,7 +56,7 @@ export class AccountController {
 
   @Delete('github')
   async unlink(@Req() req: Request) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const login = me(req);
       unlinkGithub(login);
@@ -71,7 +68,7 @@ export class AccountController {
   // 탈퇴 — 쿠키도 지운다
   @Post('withdraw')
   async withdraw(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() b: { password?: string; confirm?: string }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const login = me(req);
       withdraw(login, b || {});
@@ -94,7 +91,7 @@ export class AccountsAdminController {
 
   @Post(':login/:action')
   async act(@Req() req: Request, @Param('login') login: string, @Param('action') action: string) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     if (!ADMIN_ACTIONS.includes(action as AdminAction)) throw new BadRequestException(`조치는 ${ADMIN_ACTIONS.join(', ')} 입니다`);
     const by = me(req);
     try {

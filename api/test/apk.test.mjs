@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { readReleaseBody, contentDisposition, rateLimiter } = await import('../dist/apks/release.js');
+const { readReleaseBody, contentDisposition } = await import('../dist/apks/release.js');
+const { rateLimiter } = await import('../dist/core/rate-limit.js');
 const { apkApps, hasReleases, isApkKind } = await import('../dist/apks/apps.js');
 
 test('릴리스 본문 — versionCode·SHA-256·빌드 주소', () => {

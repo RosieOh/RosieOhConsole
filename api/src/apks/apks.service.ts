@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { pathOf } from '../catalog/merge.js';
-import { cfg, repoUrl, full } from '../config.js';
-import { ghJson, ghPaged } from '../github.js';
+import { cfg, repoUrl, full } from '../core/config.js';
+import { ghJson, ghPaged } from '../core/github.js';
 import { readReleaseBody } from './release.js';
 import { ApkKind, hasReleases } from './apps.js';
 import { Change, normVersion, splitVersions, summarize } from './changes.js';
 import { Status, VerState, currentKnox, knoxStore, statusOf } from './knox.js';
 import { SHIPPED, Shipped, cleanShipped, mergeVersions, prevShipped, shippedStore, upsertShipped, windowCommits } from './shipped.js';
-import { isSafeKey } from '../safe.js';
-import { audit } from '../audit.js';
+import { isSafeKey } from '../core/safe.js';
+import { audit } from '../core/audit.js';
 
 export interface ApkAsset { id: number; name: string; size: number; downloads: number }
 export interface ApkRelease {

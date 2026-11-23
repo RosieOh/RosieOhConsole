@@ -1,7 +1,7 @@
-import { readDoc, writeDoc } from '../persist.js';
+import { readDoc, writeDoc } from '../core/persist.js';
 import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { audit } from '../audit.js';
-import { cfg, repoUrl, full } from '../config.js';
+import { audit } from '../core/audit.js';
+import { cfg, repoUrl, full } from '../core/config.js';
 import { DeployTrack, ServiceDef } from '../registry.js';
 import { EnvKey, StatusService } from '../status.service.js';
 import { RunReading, VERSION_RE, fillInputs, readKamalJobs } from './kamal-log.js';
@@ -9,8 +9,8 @@ import { Floor, blockedBy, firstRunOf } from './floor.js';
 import { openFailure } from './failures.js';
 import { isReleaseTitle, previousVersion } from './versions.js';
 import { Change, summarize } from '../apks/changes.js';
-import { ghFetch, ghJson } from '../github.js';
-import { JsonStore } from '../json-store.js';
+import { ghFetch, ghJson } from '../core/github.js';
+import { JsonStore } from '../core/json-store.js';
 
 export interface DeployRun {
   id: number; number: number; url: string; workflow: string; branch: string; sha: string; event: string; actor: string;

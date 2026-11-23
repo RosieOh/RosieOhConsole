@@ -1,6 +1,6 @@
-import { readDoc, writeDoc } from './persist.js';
+import { readDoc, writeDoc } from './core/persist.js';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { cfg } from './config.js';
+import { cfg } from './core/config.js';
 import { Endpoint, ServiceDef, loadRegistry } from './registry.js';
 
 export type EnvKey = 'testbed' | 'prod';

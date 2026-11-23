@@ -1,5 +1,5 @@
-import { cfg } from '../config.js';
-import { JsonStore, Versioned } from '../json-store.js';
+import { cfg } from '../core/config.js';
+import { JsonStore, Versioned } from '../core/json-store.js';
 
 // 녹스(Knox) 적용 상태 — 담당자가 받아서 녹스에 올렸는지 직접 표시한다. 받기만 하고 표시 안 하면 "QA 중"
 export interface VerState { downloads: number; lastDownload?: { at: string; who: string }; knox?: { at: string; by: string }; note?: { text: string; by: string; at: string } }

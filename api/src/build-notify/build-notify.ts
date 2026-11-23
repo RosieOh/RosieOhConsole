@@ -1,5 +1,5 @@
-import { cfg } from '../config.js';
-import { JsonStore, Versioned } from '../json-store.js';
+import { cfg } from '../core/config.js';
+import { JsonStore, Versioned } from '../core/json-store.js';
 
 // 빌드 알림 메일 받는 사람(#187). 개발용, 운영 빌드가 올라가면 빌드 워크플로의 알림 스크립트가
 // GET /dashapi/build-notify/recipients 로 이 목록을 읽어 메일을 보낸다. 꺼 두거나 비우면 보내지 않는다.

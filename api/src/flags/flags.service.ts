@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { EnvFlags, FLAG_TARGETS, FlagEnv, FlagTarget, mergeFlags, FlagSummary, summarizeFlags } from './targets.js';
 
 const TTL_MS = 10 * 1000;

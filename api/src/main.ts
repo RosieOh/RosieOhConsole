@@ -7,10 +7,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AppModule } from './app.module.js';
 import { BoardService } from './board/board.service.js';
-import { assertConfig, cfg, secureCookie } from './config.js';
-import { securityHeaders } from './security-headers.js';
+import { assertConfig, cfg, secureCookie } from './core/config.js';
+import { securityHeaders } from './core/security-headers.js';
 import { testbedProxy } from './testbed-proxy.js';
-import { closePersist, initPersist, persistInfo } from './persist.js';
+import { closePersist, initPersist, persistInfo } from './core/persist.js';
 import { banner } from './banner.js';
 
 async function bootstrap() {

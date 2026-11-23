@@ -1,13 +1,13 @@
-import { readDoc, writeDoc } from '../persist.js';
+import { readDoc, writeDoc } from '../core/persist.js';
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
-import { cfg, repoUrl, full } from '../config.js';
-import { ghFetch, ghJson } from '../github.js';
+import { cfg, repoUrl, full } from '../core/config.js';
+import { ghFetch, ghJson } from '../core/github.js';
 import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { addrOf } from '../infra/names.js';
-import { logSafe } from '../safe.js';
+import { logSafe } from '../core/safe.js';
 import { ProbeResult, alertsOf, parseProbe } from './parse.js';
 
 // 서버(D) — 점검 결과 받기·보관·요청. 로그는 메모리에만(디스크·GitHub 에 남기지 않는다)

@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { isSafeKey, logSafe } = await import('../dist/safe.js');
-const { ghUrl } = await import('../dist/github.js');
+const { isSafeKey, logSafe } = await import('../dist/core/safe.js');
+const { ghUrl } = await import('../dist/core/github.js');
 const { sanitizeSvg, sniff } = await import('../dist/catalog/logos.js');
 
 test('객체 키 — 원형을 바꾸는 이름은 거절', () => {

@@ -1,4 +1,4 @@
-import { cfg } from '../config.js';
+import { cfg } from '../core/config.js';
 
 // GitHub OAuth — 신원 확인만 한다. 사용자 토큰은 저장하지 않는다(scope 없음 = 공개 프로필만).
 export const redirectUri = () => `${cfg.publicUrl}/dashapi/oauth/callback`;

@@ -1,17 +1,14 @@
-import { Body, Controller, ForbiddenException, Get, HttpException, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, Post, Query, Req, Res } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { cfg, secureCookie, originOk } from '../config.js';
-import { audit } from '../audit.js';
+import { cfg, secureCookie } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
+import { audit } from '../core/audit.js';
 import { AccountError, githubLogin, linkGithub, passwordLogin, signup } from '../accounts/accounts.js';
 import { authorizeUrl, exchangeCode, whoAmI } from './github-oauth.js';
 import { SESSION_COOKIE, STATE_COOKIE, TTL_MS, sessionOf, signSession } from './session.js';
 
 const cookieOpts = () => ({ httpOnly: true, secure: secureCookie(), sameSite: 'lax' as const, path: '/' });
-const sameOrigin = (req: Request) => {
-  const origin = req.get('origin');
-  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
-};
 /** 계정 오류 → HTTP 오류(화면이 code 로 갈래를 탄다) */
 export const httpOf = (e: unknown) => (e instanceof AccountError ? new HttpException({ message: e.message, code: e.code }, e.status) : e);
 
@@ -74,7 +71,7 @@ export class AuthController {
   // 아이디·비밀번호 로그인
   @Post('auth/login')
   passwordLogin(@Body() b: { login?: string; password?: string }, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const a = passwordLogin(String(b?.login ?? ''), String(b?.password ?? ''), req.ip || '?');
       giveSession(res, a.login, a.sv);
@@ -85,7 +82,7 @@ export class AuthController {
   // 회원가입 — 승인 대기로 남는다(세션은 주지 않는다)
   @Post('auth/signup')
   async signup(@Body() b: { login?: string; name?: string; email?: string; password?: string }, @Req() req: Request) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     try {
       const a = signup(b || {}, req.ip || '?');
       await audit({ login: a.login, action: 'account.signup', target: a.login, detail: `승인 대기, ${req.ip}`, ok: true });
@@ -95,7 +92,7 @@ export class AuthController {
 
   @Post('logout')
   logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    sameOrigin(req);   // 다른 사이트가 몰래 로그아웃시키지 못하게
+    assertSameOrigin(req);   // 다른 사이트가 몰래 로그아웃시키지 못하게
     res.clearCookie(SESSION_COOKIE, cookieOpts());
     return { ok: true };
   }

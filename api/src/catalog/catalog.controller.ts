@@ -1,14 +1,10 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AdminOnly, AuthGuard } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg, originOk } from '../config.js';
+import { cfg } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
 import { CatalogOp, CatalogService } from './catalog.service.js';
-
-const sameOrigin = (req: Request) => {
-  const origin = req.get('origin');
-  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
-};
 
 @UseGuards(AuthGuard)
 @Controller('dashapi/catalog')
@@ -21,7 +17,7 @@ export class CatalogController {
   @AdminOnly()
   @Post('ops')
   ops(@Req() req: Request, @Body() b: { rev: number; ops: CatalogOp[] }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     return this.catalog.apply(sessionOf(req)!.login, Number(b?.rev), b?.ops);
   }
 
@@ -42,7 +38,7 @@ export class CatalogController {
   @AdminOnly()
   @Post('logo')
   upload(@Req() req: Request, @Body() b: { data?: string }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     const raw = String(b?.data || '').replace(/^data:[^,]*,/, '');
     if (!raw) throw new BadRequestException('파일이 없습니다');
     try { return { file: this.catalog.saveLogo(Buffer.from(raw, 'base64')) }; }

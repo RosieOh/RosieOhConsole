@@ -1,8 +1,8 @@
-import { readDoc, writeDoc } from '../persist.js';
+import { readDoc, writeDoc } from '../core/persist.js';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg, full } from '../config.js';
-import { ghFetch, ghJson, ownerRepos } from '../github.js';
+import { cfg, full } from '../core/config.js';
+import { ghFetch, ghJson, ownerRepos } from '../core/github.js';
 import { normName, placeOf, retired, RunnerPlace } from './known.js';
 import { History, JobLite, queueOf, record, RunnerStats, statsFor, toJob, uptime } from './stats.js';
 import { parseWorkflow, resolveLabel, runnerMatches, TemplateRef, WfFile } from './workflows.js';

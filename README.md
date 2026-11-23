@@ -35,11 +35,12 @@
 ## 기술
 - **web**: React 19 · Vite 8 · TypeScript 7 · three.js(로그인 화면만, 동적 로딩). 업무보드 화면도 여기(`web/src/board/`) — 한 SPA, 한 빌드
 - **api**: NestJS 12 (ESM) · Express 5 · Node 22 — `/dashapi/*` + `/board/api/*` + 화면 정적 서빙(단일 컨테이너)
-- 저장(`api/src/persist.ts`): `DATABASE_URL` 이 있으면 **MariaDB**, 없으면 `DATA_DIR`(기본 `/data`)의 JSON 파일(로컬 개발·시험)
+- 저장(`api/src/core/persist.ts`): `DATABASE_URL` 이 있으면 **MariaDB**, 없으면 `DATA_DIR`(기본 `/data`)의 JSON 파일(로컬 개발·시험)
   - `store(name, rev, value)` — 문서 하나가 한 줄: `catalog` · `access` · `accounts` · `board` · `schedules` · `relations` · `deploy-readings` …(파일 모드의 `<name>.json` 과 같은 이름)
   - `audit` — 감사 로그, `blob_file` — 로고 그림
   - 표는 시작할 때 스스로 만든다. 문서는 시작할 때 메모리로 읽고, 쓰기는 메모리 → DB 차례로. DB 에 없고 `DATA_DIR` 에 옛 파일이 있으면 처음 한 번 옮겨 온다
-- GitHub 호출은 `api/src/github.ts`(`ghFetch`·`ghJson`·`ghRaw`·`ghPaged`·`ghGraphql`·`ownerRepos`) 한 곳으로
+- GitHub 호출은 `api/src/core/github.ts`(`ghFetch`·`ghJson`·`ghRaw`·`ghPaged`·`ghGraphql`·`ownerRepos`) 한 곳으로
+- 공통(`api/src/core/`): 설정(`config`), GitHub(`github`), 저장(`persist`·`json-store`), 감사 로그(`audit`), 출처 검사(`http` 의 `assertSameOrigin`), 요청 제한(`rate-limit` 의 `SlidingWindow`), 보안 헤더, 안전한 키·로그(`safe`). 기능 모듈은 여기서 가져다 쓰고, 같은 도우미를 모듈마다 새로 만들지 않는다
 
 ## 환경변수
 `.env.example` 참고. 꼭 필요한 것은 `OAUTH_CLIENT_ID`·`OAUTH_CLIENT_SECRET`(GitHub OAuth 앱, 콜백 `<PUBLIC_URL>/dashapi/oauth/callback`) · `SESSION_SECRET`(32자 이상). `GITHUB_TOKEN` 이 없으면 공개 API 한도(시간당 60회)로 돌고 업무보드(GraphQL)는 읽지 못한다. 쓰기(되돌리기·운영 반영·시크릿·업무보드 옮기기·서버 점검 요청)는 `GITHUB_WRITE_TOKEN`.

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { ghJson, ghFetch, ghStats } = await import('../dist/github.js');
+const { ghJson, ghFetch, ghStats } = await import('../dist/core/github.js');
 
 test('ETag — 304 면 담아 둔 본문, POST 는 담지 않는다', async () => {
   const real = globalThis.fetch;

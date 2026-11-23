@@ -1,6 +1,6 @@
 import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { getBlob } from '../persist.js';
+import { getBlob } from '../core/persist.js';
 import { LOGO_FILE_RE, LOGO_TYPES, LogoExt } from './logos.js';
 import { CatalogService } from './catalog.service.js';
 

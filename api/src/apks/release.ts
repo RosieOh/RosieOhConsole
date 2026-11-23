@@ -24,15 +24,3 @@ export function contentDisposition(name: string) {
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
-/** IP 당 1분에 n 번 — 로그인 없는 다운로드를 막 쓰지 못하게 */
-export function rateLimiter(n: number, windowMs = 60_000) {
-  const hits = new Map<string, number[]>();
-  return (key: string, now = Date.now()) => {
-    const list = (hits.get(key) || []).filter((t) => now - t < windowMs);
-    if (list.length >= n) { hits.set(key, list); return false; }
-    list.push(now);
-    hits.set(key, list);
-    if (hits.size > 5000) for (const [k, v] of hits) if (!v.some((t) => now - t < windowMs)) hits.delete(k);
-    return true;
-  };
-}

@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { join } from 'node:path';
-import { audit } from '../audit.js';
-import { cfg } from '../config.js';
-import { JsonStore, RevConflict } from '../json-store.js';
+import { audit } from '../core/audit.js';
+import { cfg } from '../core/config.js';
+import { JsonStore, RevConflict } from '../core/json-store.js';
 import { __PASCAL__Item, invalid, toView } from './model.js';
 
 interface Doc { rev: number; items: __PASCAL__Item[] }
