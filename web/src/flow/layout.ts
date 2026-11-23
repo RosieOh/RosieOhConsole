@@ -12,7 +12,8 @@ const COL_OF: Record<string, keyof typeof COL> = {
   db: 'data', redis: 'data', external: 'data',
 };
 
-export function layout(g: FlowGraph) {
+export function layout(g: FlowGraph, opts: { compact?: boolean } = {}) {
+  if (opts.compact) return compactLayout(g);
   const placed: Placed[] = [];
   const compY = new Map<string, number>();
   let y = 0;
@@ -62,6 +63,67 @@ export function layout(g: FlowGraph) {
     }
   }
   return { placed, height: Math.max(leftHeight, ...placed.map((p) => p.y + p.h)) };
+}
+
+/**
+ * 구성도용 촘촘한 배치 — 서비스 한 줄마다 그 서비스만 쓰는 것(자기 DB·Redis)을 바로 옆에 두고,
+ * 여럿이 같이 쓰는 것(S3·GitHub·GitHub Pages·Vercel)만 오른쪽 열에 모은다. 프로젝트 틀은 그리지 않는다(그룹 제목만)
+ */
+export const CX = { own: COMP_W + 90, shared: COMP_W + 90 + NODE_W + 150 };
+const IH = 62, IGAP = 10, ROW_PAD = 14;
+export function compactLayout(g: FlowGraph) {
+  const placed: Placed[] = [];
+  const compY = new Map<string, number>();
+  const nodeById = new Map([...g.infra, ...g.virtual].map((n) => [n.id, n]));
+  const usersOf = new Map<string, Set<string>>();
+  for (const r of g.relations) if (!r.to.startsWith('comp:') && nodeById.has(r.to)) usersOf.set(r.to, new Set([...(usersOf.get(r.to) || []), r.from]));
+  // 배포 대상(v:host-*)은 하나만 써도 오른쪽 열 — 어디에 올라가 있는지 한곳에서 보이게
+  const shared = (id: string) => (usersOf.get(id)?.size ?? 0) > 1 || id.startsWith('v:host-');
+  const ownOf = new Map<string, string[]>();
+  for (const [id, us] of usersOf) if (!shared(id)) { const c = [...us][0]; ownOf.set(c, [...(ownOf.get(c) || []), id]); }
+
+  const comps = new Map<string, typeof g.components>();
+  for (const c of g.components) comps.set(c.project, [...(comps.get(c.project) || []), c]);
+  let y = 0;
+  const walk = (list: CatalogNode[], depth: number, path: string[]) => {
+    for (const n of list) {
+      if (n.type === 'group') {
+        placed.push({ id: `grp:${n.id}`, x: 0, y, w: COMP_W, h: 24, kind: 'grouplabel', label: [...path, n.name].join(' › '), data: { logo: n.logo, name: n.name } });
+        y += 30;
+        walk(n.children, depth + 1, [...path, n.name]);
+        y += 12;
+        continue;
+      }
+      for (const c of comps.get(n.id) ?? []) {
+        const id = `comp:${c.key}`;
+        const own = ownOf.get(id) ?? [];
+        const rowH = Math.max(COMP_H, own.length * (IH + IGAP) - IGAP);
+        const cy = y + (rowH - COMP_H) / 2;
+        placed.push({ id, x: 12, y: cy, w: COMP_W, h: COMP_H, kind: 'comp', label: c.name, data: { comp: c } });
+        compY.set(id, cy + COMP_H / 2);
+        own.forEach((t, i) => {
+          const node = nodeById.get(t)!;
+          placed.push({ id: t, x: CX.own, y: y + i * (IH + IGAP), w: NODE_W, h: IH, kind: node.kind, label: node.name, sub: node.sub, data: { discovered: node.discovered } });
+        });
+        y += rowH + ROW_PAD;
+      }
+    }
+  };
+  walk(g.projects, 0, []);
+
+  // 같이 쓰는 것 — 쓰는 서비스들 높이의 가운데에, 겹치지 않게 민다
+  const want = [...usersOf.keys()].filter(shared).map((id) => {
+    const ys = [...usersOf.get(id)!].map((c) => compY.get(c)).filter((v): v is number => v !== undefined);
+    return { id, y: ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : 0 };
+  }).sort((a, b) => a.y - b.y);
+  let floor = -Infinity;
+  for (const w of want) {
+    const node = nodeById.get(w.id)!;
+    const top = Math.max(w.y - IH / 2, floor);
+    placed.push({ id: w.id, x: CX.shared, y: top, w: NODE_W, h: IH, kind: node.kind, label: node.name, sub: node.sub, data: { discovered: node.discovered } });
+    floor = top + IH + 14;
+  }
+  return { placed, height: Math.max(y, ...placed.map((p) => p.y + p.h)) };
 }
 
 /** 배포 갈래를 선분으로 — path 의 a|b 는 갈림길(부모앱 OTA·스토어) */
