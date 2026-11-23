@@ -4,7 +4,8 @@ import { listAccess } from '../access/access.js';
 import { audit } from '../audit.js';
 import { sessionOf } from '../auth/session.js';
 import { REPO_RE, cfg, full, originOk } from '../config.js';
-import { ghFetch, ghGraphql, ghJson, ownerRepos } from '../github.js';
+import { ghFetch, ghGraphql, ghJson } from '../github.js';
+import { cleanText, collect, directRepo, searchGraphql, searchQueries } from './repo-search.js';
 import { JsonStore, Versioned } from '../json-store.js';
 import { isSafeKey } from '../safe.js';
 import { BLOCKED_LABEL, Card, GqlIssue, STAGES, STAGE_COLOR, STAGE_KO, STAGE_LABEL, Stage, draftReport, stageLabels, toCard } from './derive.js';
@@ -150,15 +151,35 @@ export class BoardService {
     return { viewers: this.store.get().viewers, admins, candidates: [...new Set([...a.roots, ...Object.keys(a.users)])].sort() };
   }
 
+  // 내가 속한 조직 — 토큰 주인의 조직 + GITHUB_ORGS. 30분 동안 담아 둔다
+  private orgsCache: { at: number; list: string[] } | null = null;
+  private async myOrgs(): Promise<string[]> {
+    if (this.orgsCache && Date.now() - this.orgsCache.at < 30 * 60_000) return this.orgsCache.list;
+    const d = await ghGraphql<any>('query { viewer { organizations(first: 100) { nodes { login } } } }', {}).catch(() => null);
+    const list = [...new Set([...((d?.viewer?.organizations?.nodes || []) as any[]).map((n) => String(n.login)), ...cfg.orgs])];
+    this.orgsCache = { at: Date.now(), list };
+    return list;
+  }
+
+  /** 저장소 찾기 — 주인 저장소 + 내가 속한 모든 조직. 비우면 최근 수정 순, '조직/저장소' 는 그대로 찾는다 */
   private async reposView(qText: string) {
     const tracked = this.store.get().repos;
-    const ql = qText.trim().toLowerCase();
-    const all = ql ? await ownerRepos().catch(() => [] as any[]) : [];
-    const results = all.filter((r) => String(r.name).toLowerCase().includes(ql)).slice(0, 30).map((r) => ({
-      repo: String(r.name), description: String(r.description || ''), private: !!r.private, updated: r.pushed_at || r.updated_at || null,
-      tracked: tracked.some((t) => t.repo === r.name),
-    }));
-    return { tracked, results, types: TYPES, org: cfg.owner };
+    const base = { tracked, types: TYPES, org: cfg.owner };
+    try {
+      const orgs = await this.myOrgs();
+      const direct = directRepo(qText);
+      const text = cleanText(direct ? direct.name : qText);
+      // 직접 찾은 저장소가 없으면 그 별칭만 오류다 — 나머지 결과는 쓴다
+      const res = await ghFetch('graphql', { method: 'POST', body: JSON.stringify({ query: searchGraphql(searchQueries(text, cfg.owner, orgs), direct) }) }, undefined, 30000);
+      const j: any = await res.json().catch(() => ({}));
+      if (!res.ok || !j.data) throw new Error(j.errors?.[0]?.message || j.message || `HTTP ${res.status}`);
+      const data = j.data;
+      const results = collect(data, cfg.owner).map((r) => ({ ...r, tracked: tracked.some((t) => t.repo.toLowerCase() === r.repo.toLowerCase()) }));
+      return { ...base, results, orgs };
+    } catch (e: any) {
+      // 못 찾으면 빈 결과 대신 까닭을 보인다(토큰·한도)
+      return { ...base, results: [], error: `GitHub 에서 찾지 못했습니다: ${e?.message || e}` };
+    }
   }
 
   private async reportView() {
