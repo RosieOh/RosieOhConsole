@@ -27,6 +27,6 @@
     "@types/express": "^5.0.3",
     "@types/libsodium-wrappers": "^0.8.2",
     "@types/node": "^22.15.0",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }
