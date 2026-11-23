@@ -1383,3 +1383,7 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 [data-sonner-toast] .board-toast-cancel {
   background: var(--hover) !important; color: var(--text-2) !important;
 }
+/* 저장소 찾기 — 조직 이름은 흐리게, 비공개·보관 표시 */
+.board-repo-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.board-repo-org { font-weight: 500; color: var(--muted); }
+.board-repo-tag { flex-shrink: 0; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }

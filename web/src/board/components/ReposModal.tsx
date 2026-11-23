@@ -11,6 +11,12 @@ import { SkeletonRows } from './Skeleton';
 const guess = (name: string) => /backend|server/i.test(name) ? 'backend-jenkins' : /web/i.test(name) ? 'web'
   : /app|parents|kids|child|protect|mobile|v2/i.test(name) ? 'app-store' : 'none';
 
+/** 저장소 이름 — 조직 저장소는 조직 이름을 앞에 흐리게(같은 이름이 여러 조직에 있어도 가린다) */
+function RepoName({ repo }: { repo: string }) {
+  const i = repo.indexOf('/');
+  return <span className="board-repo-name" title={repo}>{i > 0 ? <><span className="board-repo-org">{repo.slice(0, i)}/</span>{repo.slice(i + 1)}</> : repo}</span>;
+}
+
 /** 저장소 (관리자) — 보드와 주간보고가 보는 저장소를 GitHub 에서 찾아 추가·삭제, 배포 확인 방법 선택 */
 export function ReposModal({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
   const [data, setData] = useState<ReposData | null>(null);
@@ -56,20 +62,21 @@ export function ReposModal({ onClose, onChanged }: { onClose: () => void; onChan
       <ul className="board-list tall">
         {!data ? <SkeletonRows n={5} /> : data.tracked.length ? data.tracked.map((t) => (
           <li key={t.repo} className="board-repo-grid">
-            <span className="board-repo-name">{repoShort(t.repo)}</span>
+            <RepoName repo={t.repo} />
             {select(t.type, (v) => void change({ action: 'type', repo: t.repo, type: v }, '배포 확인 방법을 바꿨습니다'))}
             <button type="button" className="btn sm board-del" onClick={() => change({ action: 'remove', repo: t.repo }, `${repoShort(t.repo)} 을(를) 뺐습니다`)}>빼기</button>
           </li>
         )) : <li className="board-list-empty">아직 없습니다</li>}
       </ul>
       <h5>GitHub 에서 찾아 추가</h5>
+      <p className="board-note">내 저장소{data?.orgs?.length ? `와 내가 속한 조직 ${data.orgs.length}곳` : ''}에서 찾습니다. <code>조직/저장소</code> 를 그대로 넣어도 됩니다.</p>
       <input className="board-repo-q" value={q} placeholder="저장소 이름으로 검색 (비우면 최근 수정 순)" aria-label="저장소 검색" autoFocus
         onChange={(e) => { const v = e.target.value; setQ(v); setSearching(true); clearTimeout(timer.current); timer.current = setTimeout(() => void load(v), 250); }} />
       <Head />
       <ul className="board-list short">
         {!data || searching ? <SkeletonRows n={3} /> : data.results.length ? data.results.map((r) => (
           <li key={r.repo} className="board-repo-grid">
-            <span className="board-repo-cell"><span className="board-repo-name">{repoShort(r.repo)}</span>
+            <span className="board-repo-cell"><span className="board-repo-line"><RepoName repo={r.repo} />{r.private && <span className="board-repo-tag">비공개</span>}{r.archived && <span className="board-repo-tag">보관됨</span>}</span>
               {r.description && <span className="board-repo-desc">{r.description}</span>}</span>
             {r.tracked ? <span className="board-repo-note">이미 보는 중</span>
               : select(pending[r.repo] || guess(r.repo), (v) => setPending({ ...pending, [r.repo]: v }))}
@@ -77,7 +84,7 @@ export function ReposModal({ onClose, onChanged }: { onClose: () => void; onChan
               : <button type="button" className="btn sm board-add"
                   onClick={() => change({ action: 'add', repo: r.repo, type: pending[r.repo] || guess(r.repo) }, `${repoShort(r.repo)} 을(를) 추가했습니다`)}>추가</button>}
           </li>
-        )) : <li className="board-list-empty">찾는 저장소가 없습니다</li>}
+        )) : <li className="board-list-empty">{data.error || '찾는 저장소가 없습니다'}</li>}
       </ul>
     </Modal>
   );

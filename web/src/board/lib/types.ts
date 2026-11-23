@@ -65,6 +65,6 @@ export interface ReportProject {
 export interface ReportData { ok: boolean; week: string; weekFound: boolean; legacyRemoved: number; projects: ReportProject[] }
 
 export interface TrackedRepo { repo: string; type: string }
-export interface RepoSearchResult { repo: string; description: string; private: boolean; updated: string | null; tracked: boolean }
-export interface ReposData { tracked: TrackedRepo[]; results: RepoSearchResult[]; types: Record<string, string>; org: string }
+export interface RepoSearchResult { repo: string; owner?: string; description: string; private: boolean; archived?: boolean; updated: string | null; tracked: boolean }
+export interface ReposData { tracked: TrackedRepo[]; results: RepoSearchResult[]; types: Record<string, string>; org: string; orgs?: string[]; error?: string }
 export interface ViewersData { viewers: string[]; admins: string[]; candidates: string[] }
