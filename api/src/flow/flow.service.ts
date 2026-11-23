@@ -6,7 +6,7 @@ import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
 import { RelationsService } from '../relations/relations.service.js';
 import { LaneKind, STAGES, Step, sliceLog, stageOf, tailLog } from './lanes.js';
-import { PipeTarget, Pipeline, pipelineQuery, toPipeline } from './pipelines.js';
+import { PipeTarget, Pipeline, deployHostOf, pipelineQuery, toPipeline } from './pipelines.js';
 
 // 전체 도식 + 실시간 배포(B·F). 도식은 카탈로그·인프라·연관 관계로 만들고, 실행 중인 배포는 저장소 Actions 를 짧게 돌며 읽는다.
 export interface Track { comp: string; lane: LaneKind; repo: string; workflow: string }
@@ -254,11 +254,18 @@ export class FlowService implements OnModuleInit, OnModuleDestroy {
         if (c.store) lanes.push({ id: `${c.key}:apptest`, comp: c.key, lane: 'apptest', path: [from, 'infra:github', `infra:${p.runner}`, 'infra:apk-release|infra:stores', 'v:testers'] });
       }
     }
-    const relations = this.rel.liveEdges().filter((e) => e.from.startsWith('comp:'));
+    const relations = this.rel.liveEdges().filter((e) => e.from.startsWith('comp:'))
+      .map((e) => ({ id: e.id, from: e.from, to: e.to, via: e.via, state: e.state as string }));
+    // 배포 대상 — GitHub Deployments 환경이 있는 구성요소 → GitHub Pages·Vercel 등(구성도에서 어디에 올라가 있는지)
+    for (const t of this.pipeTargets()) {
+      const h = deployHostOf(t.site, t.environment);
+      if (!virtual.some((v) => v.id === h.id)) virtual.push({ id: h.id, kind: 'server', name: h.name, sub: h.sub });
+      relations.push({ id: `deploy:${t.key}`, from: `comp:${t.key}`, to: h.id, via: `배포 · ${t.environment}`, state: 'deploy' });
+    }
     return {
       projects: cat.roots, components: comps,
       infra: [...infra.values()], virtual,
-      lanes, relations: relations.map((e) => ({ id: e.id, from: e.from, to: e.to, via: e.via, state: e.state })),
+      lanes, relations,
       stages: Object.fromEntries(Object.entries(STAGES).map(([k, v]) => [k, v.map((s) => ({ id: s.id, label: s.label }))])),
       infraDefs: DEFAULT_INFRA.map((i) => i.id),
     };

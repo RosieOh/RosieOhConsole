@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { toPipeline, pipelineQuery, deployState, suiteState } = await import('../dist/flow/pipelines.js');
+const { toPipeline, pipelineQuery, deployState, suiteState, deployHostOf } = await import('../dist/flow/pipelines.js');
 
 const T = { key: 'blog', name: '블로그', repo: 'RosieOh/blog', owner: 'RosieOh', repoName: 'blog', environment: 'github-pages', site: 'https://rosieoh.github.io/blog/' };
 const run = (id, name, status, conclusion = null) => ({ app: { slug: 'github-actions' }, status, conclusion,
@@ -98,4 +98,14 @@ test('질의 — 별칭마다 저장소·환경이 들어가고 문자열은 이
   assert.match(q, /r0: repository\(owner: "RosieOh", name: "blog"\)/);
   assert.match(q, /r1: repository\(owner: "RosieOh", name: "we\\"ird"\)/);
   assert.match(q, /environments: \["Production"\]/);
+});
+
+test('배포 대상 — 주소로 GitHub Pages·Vercel·그 밖의 호스트', () => {
+  assert.equal(deployHostOf('https://rosieoh.github.io/x/', 'github-pages').id, 'v:host-pages');
+  assert.equal(deployHostOf(undefined, 'github-pages').name, 'GitHub Pages');
+  assert.equal(deployHostOf('https://rosiesblog.vercel.app', 'Production').id, 'v:host-vercel');
+  const own = deployHostOf('https://console.example.com', 'production');
+  assert.equal(own.id, 'v:host-console.example.com');
+  assert.equal(own.name, 'console.example.com');
+  assert.equal(deployHostOf('not a url', 'Staging').id, 'v:host-staging');
 });
