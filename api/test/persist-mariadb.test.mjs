@@ -11,8 +11,8 @@ const skip = url ? false : 'TEST_DATABASE_URL 없음';
 
 test('MariaDB — 문서·rev·감사·파일, 다시 열어도 남는다, 옛 파일은 옮겨 온다', { skip }, async () => {
   process.env.DATA_DIR = mkdtempSync(tmpdir() + '/mxc-db-');
-  const P = await import('../dist/persist.js');
-  const { JsonStore, RevConflict } = await import('../dist/json-store.js');
+  const P = await import('../dist/core/persist.js');
+  const { JsonStore, RevConflict } = await import('../dist/core/json-store.js');
   const mariadb = await import('mariadb');
 
   // 이 시험의 이름만 지운다(다른 데이터는 건드리지 않는다)

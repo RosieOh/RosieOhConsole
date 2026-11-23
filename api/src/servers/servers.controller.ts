@@ -1,15 +1,11 @@
-import { Body, Controller, ForbiddenException, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard, DeployerOnly } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { cfg, originOk } from '../config.js';
+import { cfg } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
 import { RelationsService } from '../relations/relations.service.js';
 import { ServersService } from './servers.service.js';
-
-const sameOrigin = (req: Request) => {
-  const origin = req.get('origin');
-  if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
-};
 
 // 받는 쪽 — 로그인 없이, PROBE_TOKEN 으로(본문은 main.ts 에서 text 로 읽는다)
 @Controller('dashapi/probe')
@@ -36,7 +32,7 @@ export class ServersController {
 
   @Post(':id/probe')
   probe(@Req() req: Request, @Param('id') id: string) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     return this.servers.request(sessionOf(req)!.login, id, 'probe');
   }
 
@@ -44,7 +40,7 @@ export class ServersController {
   @DeployerOnly()
   @Post(':id/logs')
   requestLogs(@Req() req: Request, @Param('id') id: string, @Body() b: { target?: string; lines?: number }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     return this.servers.request(sessionOf(req)!.login, id, 'logs', String(b?.target || ''), '', Number(b?.lines) || 300);
   }
 
@@ -55,7 +51,7 @@ export class ServersController {
   @DeployerOnly()
   @Post(':id/restart')
   restart(@Req() req: Request, @Param('id') id: string, @Body() b: { target?: string; confirm?: string }) {
-    sameOrigin(req);
+    assertSameOrigin(req);
     return this.servers.request(sessionOf(req)!.login, id, 'restart', String(b?.target || ''), String(b?.confirm || ''));
   }
 }

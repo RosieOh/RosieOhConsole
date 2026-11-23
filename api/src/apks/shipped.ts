@@ -1,6 +1,6 @@
 import { ChangeKind } from './changes.js';
-import { cfg } from '../config.js';
-import { JsonStore, Versioned } from '../json-store.js';
+import { cfg } from '../core/config.js';
+import { JsonStore, Versioned } from '../core/json-store.js';
 
 // 출고한 버전 기록의 기본값(콘솔에서 고치면 apk-shipped.json 이 이 앱의 기록을 대신한다).
 // line 은 같은 앱 안의 출고 줄. 앞 출고와 비교할 때 같은 줄끼리만 본다.

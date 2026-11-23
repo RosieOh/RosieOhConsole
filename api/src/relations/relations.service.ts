@@ -1,13 +1,13 @@
-import { readDoc, writeDoc } from '../persist.js';
+import { readDoc, writeDoc } from '../core/persist.js';
 import { BadRequestException, ConflictException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg, full } from '../config.js';
-import { ghJson, ghRaw } from '../github.js';
+import { cfg, full } from '../core/config.js';
+import { ghJson, ghRaw } from '../core/github.js';
 import { DEFAULT_INFRA, InfraKind, SCAN_PATHS } from '../infra/defaults.js';
 import { infraName } from '../infra/names.js';
-import { JsonStore, RevConflict, Versioned } from '../json-store.js';
-import { isSafeKey } from '../safe.js';
+import { JsonStore, RevConflict, Versioned } from '../core/json-store.js';
+import { isSafeKey } from '../core/safe.js';
 import { Clue, Known, extractClues, hostOf, matchClues, wantFile } from './scan.js';
 
 // 연관 관계(A2) — 저장소 설정 파일에서 자동으로 찾고(/data/relations-scan.json), 사람이 확정·거절·추가(/data/relations.json)

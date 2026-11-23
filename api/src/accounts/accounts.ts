@@ -1,7 +1,8 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { cfg } from '../config.js';
-import { JsonStore, Versioned } from '../json-store.js';
+import { cfg } from '../core/config.js';
+import { JsonStore, Versioned } from '../core/json-store.js';
 import { isAllowed, roleOf, setRole } from '../access/access.js';
+import { SlidingWindow } from '../core/rate-limit.js';
 
 // 회원 — 콘솔 자체 계정(아이디·비밀번호)과 GitHub 로그인을 한 명단으로.
 // 저장: 문서 'accounts'(MariaDB store 표, DB 가 없으면 DATA_DIR/accounts.json). 역할은 권한 명단(access)에 그대로 둔다.
@@ -70,26 +71,15 @@ export function passwordProblem(pw: string, login = ''): string | null {
 }
 
 // ── 로그인 실패 잠금 — IP·아이디마다 15분에 10번 ──
-const fails = new Map<string, number[]>();
-const FAIL_WINDOW = 15 * 60_000, FAIL_MAX = 10;
+const fails = new SlidingWindow(10, 15 * 60_000);
 const failKey = (ip: string, login: string) => `${ip}|${norm(login)}`;
-function locked(ip: string, login: string, t = Date.now()) {
-  const list = (fails.get(failKey(ip, login)) || []).filter((x) => t - x < FAIL_WINDOW);
-  fails.set(failKey(ip, login), list);
-  return list.length >= FAIL_MAX;
-}
-const noteFail = (ip: string, login: string) => fails.set(failKey(ip, login), [...(fails.get(failKey(ip, login)) || []), Date.now()]);
+const locked = (ip: string, login: string) => fails.full(failKey(ip, login));
+const noteFail = (ip: string, login: string) => fails.hit(failKey(ip, login));
 
 // ── 가입 제한 — IP 마다 1시간에 10번 시도, 승인 대기는 모두 합쳐 50명까지(대량 가입으로 명단을 덮지 못하게) ──
-const signups = new Map<string, number[]>();
-const SIGNUP_WINDOW = 60 * 60_000, SIGNUP_MAX = 10, PENDING_MAX = 50;
-function signupLimited(ip: string, t = Date.now()) {
-  for (const [k, v] of signups) if (!v.some((x) => t - x < SIGNUP_WINDOW)) signups.delete(k);   // 오래된 IP 는 비운다
-  const list = (signups.get(ip) || []).filter((x) => t - x < SIGNUP_WINDOW);
-  list.push(t);
-  signups.set(ip, list);
-  return list.length > SIGNUP_MAX;
-}
+const signups = new SlidingWindow(10, 60 * 60_000);
+const PENDING_MAX = 50;
+const signupLimited = (ip: string) => signups.hit(ip) > signups.max;   // 시도마다 센다(막힌 시도도)
 
 // ── 읽기 ──
 export function getAccount(login: string): Account | null { return theStore().get().users[norm(login)] ?? null; }

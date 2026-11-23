@@ -1,15 +1,15 @@
 import { BadRequestException, ConflictException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { apkApps, isApkKind } from '../apks/apps.js';
-import { audit } from '../audit.js';
-import { cfg, full, REPO_RE } from '../config.js';
-import { ghJson, ghRaw, ownerRepos } from '../github.js';
-import { JsonStore, RevConflict } from '../json-store.js';
-import { hasBlob, putBlob } from '../persist.js';
+import { audit } from '../core/audit.js';
+import { cfg, full, REPO_RE } from '../core/config.js';
+import { ghJson, ghRaw, ownerRepos } from '../core/github.js';
+import { JsonStore, RevConflict } from '../core/json-store.js';
+import { hasBlob, putBlob } from '../core/persist.js';
 import { DEFAULT_COMPONENTS, DEFAULT_NODES } from './defaults.js';
 import { LOGO_FILE_RE, LOGO_MAX, pickCandidates, prepareLogo } from './logos.js';
 import { UNASSIGNED, buildCatalog, emptyOverrides } from './merge.js';
-import { isSafeKey } from '../safe.js';
+import { isSafeKey } from '../core/safe.js';
 import { CatalogOverrides, KINDS } from './types.js';
 
 export type CatalogOp =

@@ -1,8 +1,8 @@
-import { readDoc, writeDoc } from '../persist.js';
+import { readDoc, writeDoc } from '../core/persist.js';
 import { Injectable } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg, repoUrl as urlOf, full } from '../config.js';
-import { ghJson } from '../github.js';
+import { cfg, repoUrl as urlOf, full } from '../core/config.js';
+import { ghJson } from '../core/github.js';
 import { StoreLane, latestStoreTag, readStoreLane } from './store-lane.js';
 
 // 스토어 앱(부모·보호자앱) — main 머지로 도는 릴리스 워크플로의 실행 기록과 store/<버전> 태그

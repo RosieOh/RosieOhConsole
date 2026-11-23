@@ -1,5 +1,5 @@
-import { cfg } from '../config.js';
-import { JsonStore, Versioned } from '../json-store.js';
+import { cfg } from '../core/config.js';
+import { JsonStore, Versioned } from '../core/json-store.js';
 
 // 권한 — GitHub 계정 기반. 로그인은 처음 관리자(CONSOLE_ADMINS)와 여기 등록된 사람만. 역할: admin(전부 + 카탈로그·권한 편집) · deployer(배포·되돌리기·예약·조치) · viewer(조회, 기본)
 // 처음 관리자(CONSOLE_ADMINS)는 화면에서 못 뺀다 — 관리자가 0명이 되는 잠김을 막는다.

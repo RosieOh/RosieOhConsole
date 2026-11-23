@@ -9,7 +9,7 @@ process.env.CATALOG_AUTO_LOGO = 'off';
 const { buildCatalog, emptyOverrides, pathOf, UNASSIGNED } = await import('../dist/catalog/merge.js');
 const { DEFAULT_STORE } = await import('../dist/catalog/types.js');
 const { logoScore, pickCandidates, sniff, sanitizeSvg, prepareLogo } = await import('../dist/catalog/logos.js');
-const { JsonStore } = await import('../dist/json-store.js');
+const { JsonStore } = await import('../dist/core/json-store.js');
 const { CatalogService } = await import('../dist/catalog/catalog.service.js');
 
 // 중립 fixture — 그룹 → 그룹 → 프로젝트 → 구성요소

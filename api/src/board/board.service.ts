@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { listAccess } from '../access/access.js';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { sessionOf } from '../auth/session.js';
-import { REPO_RE, cfg, full, originOk } from '../config.js';
-import { ghFetch, ghGraphql, ghJson } from '../github.js';
+import { REPO_RE, cfg, full, originOk } from '../core/config.js';
+import { CROSS_ORIGIN } from '../core/http.js';
+import { ghFetch, ghGraphql, ghJson } from '../core/github.js';
 import { cleanText, collect, directRepo, searchGraphql, searchQueries } from './repo-search.js';
-import { JsonStore, Versioned } from '../json-store.js';
-import { isSafeKey } from '../safe.js';
+import { JsonStore, Versioned } from '../core/json-store.js';
+import { isSafeKey } from '../core/safe.js';
 import { BLOCKED_LABEL, Card, GqlIssue, STAGES, STAGE_COLOR, STAGE_KO, STAGE_LABEL, Stage, draftReport, stageLabels, toCard } from './derive.js';
 
 // 업무보드 — GitHub Issues·PR 로 만든 칸반과 주간보고. 화면은 web/src/board(같은 SPA), API 는 /board/api/*(main.ts 가 넘긴다)
@@ -90,7 +91,7 @@ export class BoardService {
       throw new HttpError(404, '없는 경로입니다');
     }
     if (req.method !== 'POST') throw new HttpError(405, '허용하지 않는 방법입니다');
-    if (!originOk(req.get('origin'))) throw new HttpError(403, '다른 출처에서 온 요청입니다');
+    if (!originOk(req.get('origin'))) throw new HttpError(403, CROSS_ORIGIN);
     const b = await readJson(req);
     switch (path) {
       case '/api/move': return this.move(s, b, b.to);

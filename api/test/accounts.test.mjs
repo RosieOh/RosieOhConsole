@@ -141,7 +141,7 @@ test('터미널 비밀번호 — 처음 관리자는 계정이 없어도 만들�
   assert.equal(code(() => A.setPasswordDirect('boss', 'short')), 'bad_password');
 
   // 계정이 아직 없는 처음 관리자(새 DATA_DIR)
-  const { cfg } = await import('../dist/config.js');
+  const { cfg } = await import('../dist/core/config.js');
   cfg.dataDir = mkdtempSync(tmpdir() + '/mxc-accounts2-');   // 설정은 시작할 때 읽으므로 값을 직접 바꾼다
   A._resetAccounts();
   const made = A.setPasswordDirect('Boss', 'first-admin-7');
@@ -152,7 +152,7 @@ test('터미널 비밀번호 — 처음 관리자는 계정이 없어도 만들�
 });
 
 test('쓰기 요청 출처 — PUBLIC_URL·ALLOWED_ORIGINS 만, Origin 이 없으면 통과', async () => {
-  const { cfg, originOk } = await import('../dist/config.js');
+  const { cfg, originOk } = await import('../dist/core/config.js');
   const saved = [...cfg.allowedOrigins];
   assert.equal(originOk(undefined), true);
   assert.equal(originOk(cfg.publicUrl), true);

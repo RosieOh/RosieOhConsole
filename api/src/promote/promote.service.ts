@@ -1,14 +1,14 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
-import { audit } from '../audit.js';
+import { audit } from '../core/audit.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg, full } from '../config.js';
+import { cfg, full } from '../core/config.js';
 import { DeployService } from '../deploy/deploy.service.js';
-import { ghFetch, ghJson } from '../github.js';
-import { JsonStore, RevConflict, Versioned } from '../json-store.js';
+import { ghFetch, ghJson } from '../core/github.js';
+import { JsonStore, RevConflict, Versioned } from '../core/json-store.js';
 import { StatusService } from '../status.service.js';
-import { isSafeKey } from '../safe.js';
+import { isSafeKey } from '../core/safe.js';
 import { Plan, checkAt, issueRefs, planOf } from './plan.js';
 
 // 운영 승격·예약(B) — 테스트배드에서 지켜본 버전을 정한 시각에 운영으로.

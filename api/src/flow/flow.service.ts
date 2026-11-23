@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
-import { cfg, full } from '../config.js';
-import { ghFetch, ghJson } from '../github.js';
+import { cfg, full } from '../core/config.js';
+import { ghFetch, ghJson } from '../core/github.js';
 import { DEFAULT_INFRA, PLACEMENT } from '../infra/defaults.js';
 import { DEFAULT_COMPONENTS } from '../catalog/defaults.js';
 import { RelationsService } from '../relations/relations.service.js';

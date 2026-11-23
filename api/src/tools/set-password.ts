@@ -1,6 +1,6 @@
 // 터미널에서 계정 비밀번호 정하기 — scripts/set-password.bash 가 부른다(직접: node dist/tools/set-password.js <아이디>)
 // 비밀번호는 표준 입력 한 줄(SET_PASSWORD 환경변수도 된다). DATABASE_URL 이 있으면 MariaDB, 없으면 DATA_DIR 파일에 쓴다.
-import { closePersist, initPersist, persistInfo } from '../persist.js';
+import { closePersist, initPersist, persistInfo } from '../core/persist.js';
 import { AccountError, setPasswordDirect } from '../accounts/accounts.js';
 import { roleOf } from '../access/access.js';
 

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { cfg } from './config.js';
+import { cfg } from './core/config.js';
 import { sessionOf } from './auth/session.js';
 
 // /mxtest/<경로> → 테스트배드 TESTBED_URL/<경로>

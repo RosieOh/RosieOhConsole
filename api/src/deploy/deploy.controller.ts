@@ -1,14 +1,15 @@
-import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AdminOnly, AuthGuard, DeployerOnly } from '../auth/auth.guard.js';
 import { sessionOf } from '../auth/session.js';
-import { recentAudit } from '../audit.js';
-import { cfg, originOk } from '../config.js';
+import { recentAudit } from '../core/audit.js';
+import { cfg } from '../core/config.js';
+import { assertSameOrigin } from '../core/http.js';
 import { DeployService } from './deploy.service.js';
 import { resolvedAt } from './failures.js';
 import { StoreAppsService } from './store-apps.service.js';
 import { ApksService } from '../apks/apks.service.js';
-import { recentAudit as auditTail } from '../audit.js';
+import { recentAudit as auditTail } from '../core/audit.js';
 
 @UseGuards(AuthGuard)
 @Controller('dashapi/deploy')
@@ -68,8 +69,7 @@ export class DeployController {
   @Post('rollback')
   async rollback(@Req() req: Request, @Body() body: any) {
     // 다른 사이트에서 몰래 보내는 요청 막기 — 콘솔 화면에서 온 것만
-    const origin = req.get('origin');
-    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    assertSameOrigin(req);
     return this.deploy.rollback(sessionOf(req)!.login, body || {});
   }
 
@@ -77,8 +77,7 @@ export class DeployController {
   @AdminOnly()
   @Post('floor')
   async floor(@Req() req: Request, @Body() body: any) {
-    const origin = req.get('origin');
-    if (!originOk(origin)) throw new ForbiddenException('다른 출처에서 온 요청입니다');
+    assertSameOrigin(req);
     return this.deploy.setFloor(sessionOf(req)!.login, body || {});
   }
 }

@@ -1,5 +1,5 @@
-import { cfg } from './config.js';
-import { persistInfo } from './persist.js';
+import { cfg } from './core/config.js';
+import { persistInfo } from './core/persist.js';
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthGuard } from './auth/auth.guard.js';

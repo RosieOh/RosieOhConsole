@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { audit } from '../audit.js';
-import { cfg, full, REPO_RE } from '../config.js';
-import { ghFetch, ghJson, ghPaged, ownerRepos } from '../github.js';
+import { audit } from '../core/audit.js';
+import { cfg, full, REPO_RE } from '../core/config.js';
+import { ghFetch, ghJson, ghPaged, ownerRepos } from '../core/github.js';
 import { sealSecret } from './seal.js';
 import {
   Perm, RefKind, TeamInfo, TemplateUse, Usage, WorkflowFile, canManage, canUse, checkName, explainPerm, repoUsage, unitPerm,
